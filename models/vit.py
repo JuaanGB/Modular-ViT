@@ -6,6 +6,13 @@ from models.positional_encoding.base import BasePositionalEncoding
 from models.aggregation.base import BaseAggregation
 from models.encoder.attention import ModularAttention # El bloque encoder usará esta atención
 
+from models.vit import ModularViT
+from models.patch_embedding.vanilla import VanillaPatchEmbedding
+from models.token_injection.cls import CLSTokenInjection
+from models.positional_encoding.learnable import LearnablePositionalEncoding
+from models.encoder.encoder_block import TransformerEncoderBlock
+from models.aggregation.cls import CLSAggregation
+
 class ModularViT(nn.Module):
     def __init__(
         self,
@@ -51,3 +58,32 @@ class ModularViT(nn.Module):
         
         # 6. Clasificación final
         return self.head(global_features)
+    
+
+def create_vanilla_vit_base(img_size: int = 224, num_classes: int = 10) -> ModularViT:
+    """Instancia la arquitectura exacta de ViT-Base/16 original de 2020."""
+    embed_dim = 768
+    patch_size = 16
+    
+    patch_emb = VanillaPatchEmbedding(img_size=img_size, patch_size=patch_size, embed_dim=embed_dim)
+    tok_inj = CLSTokenInjection(embed_dim=embed_dim)
+    
+    # Num patches (196) + 1 CLS = 197 tokens max
+    pos_enc = LearnablePositionalEncoding(embed_dim=embed_dim, max_tokens=patch_emb.num_patches + 1)
+    
+    # ViT-Base cuenta con 12 bloques idénticos de codificación
+    encoder_blocks = nn.ModuleList([
+        TransformerEncoderBlock(embed_dim=embed_dim, num_heads=12, mlp_ratio=4.0)
+        for _ in range(12)
+    ])
+    
+    agg = CLSAggregation(has_cls_token=True)
+    
+    return ModularViT(
+        patch_embedding=patch_emb,
+        token_injection=tok_inj,
+        positional_encoding=pos_enc,
+        encoder_blocks=encoder_blocks,
+        aggregation=agg,
+        num_classes=num_classes
+    )
