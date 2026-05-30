@@ -6,7 +6,6 @@ from models.positional_encoding.base import BasePositionalEncoding
 from models.aggregation.base import BaseAggregation
 from models.encoder.attention import ModularAttention # El bloque encoder usará esta atención
 
-from models.vit import ModularViT
 from models.patch_embedding.vanilla import VanillaPatchEmbedding
 from models.token_injection.cls import CLSTokenInjection
 from models.positional_encoding.learnable import LearnablePositionalEncoding
