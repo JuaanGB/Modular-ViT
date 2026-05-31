@@ -77,3 +77,7 @@ class Absolute2DPositionalEncoding(BasePositionalEncoding):
         pos_embeddings[cls_mask] = self.cls_pos_embed.squeeze(0).squeeze(0)
 
         return pos_embeddings
+    
+    @staticmethod
+    def create_from_config(config: dict, execution_state: ExecutionState) -> BasePositionalEncoding:
+        return Absolute2DPositionalEncoding(execution_state=execution_state)

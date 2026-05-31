@@ -10,23 +10,24 @@ training:
   weight_decay: 0.05
 
 model:
-  name: "MNIST-ViTBase"
-  embed_dim: 768 # Para PatchEmbedding, PositionalEncoding, TokenInjection
-  # Resto de hiperparámetros (num_heads, depth, etc.)
+  name: "CIFAR10-ViTBase"
+  embed_dim: 256 # Para PatchEmbedding, PositionalEncoding, TokenInjection
+  depth: 12
+  num_heads: 12
+  mlp_ratio: 4.0
 
   patch_embedding:
     type: "vanilla"
-    size: 8
+    size: 4
 
   token_injection:
     type: "cls"
 
   positional_encoding:
     type: "learnable"
-    # num_tokens: ¿Lo calculamos o que lo calcule el usuario y lo ponga?
 
   aggregation:
     type: "cls"  
 
   attention:
-    # ... Futuros parámetros para introducir rotaciones
+    type: "vanilla"

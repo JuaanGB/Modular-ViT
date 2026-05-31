@@ -37,3 +37,7 @@ class BasePositionalEncoding(nn.Module):
         Por defecto devuelve None si es un método aditivo (Vanilla).
         """
         return None
+    
+    @staticmethod
+    def create_from_config(config: dict, execution_state: ExecutionState) -> "BasePositionalEncoding":
+        raise NotImplementedError

@@ -35,7 +35,7 @@ class BasePatchEmbedding(nn.Module):
         raise NotImplementedError
     
     @staticmethod
-    def create_from_config(config: dict, img_size: int, in_channels: int, embed_dim: int) -> "BasePatchEmbedding":
+    def create_from_config(config: dict, img_size: int, in_channels: int, embed_dim: int, execution_state: ExecutionState) -> "BasePatchEmbedding":
         """
         Args: 
             dict: Diccionario conteniendo toda la información del mecanismo de Patch Embedding

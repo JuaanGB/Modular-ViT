@@ -55,7 +55,7 @@ class VanillaPatchEmbedding(BasePatchEmbedding):
         return PatchOutput(features=features, coords=coords)
     
     @staticmethod
-    def create_from_config(config: dict, img_size: int, in_channels: int, embed_dim: int) -> BasePatchEmbedding:
+    def create_from_config(config: dict, img_size: int, in_channels: int, embed_dim: int, execution_state: ExecutionState) -> BasePatchEmbedding:
         """
         Args: 
             dict: Diccionario conteniendo toda la información del mecanismo de Patch Embedding
@@ -74,5 +74,6 @@ class VanillaPatchEmbedding(BasePatchEmbedding):
             img_size=img_size,
             patch_size=size,
             in_channels=in_channels,
-            embed_dim=embed_dim
+            embed_dim=embed_dim,
+            execution_state=execution_state
         )

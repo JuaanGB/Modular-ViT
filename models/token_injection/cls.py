@@ -33,5 +33,5 @@ class CLSTokenInjection(BaseTokenInjection):
         return TokenStrategyOutput(features=extended_features, coords=extended_coords)
 
     @staticmethod
-    def create_from_config(config: dict, embed_dim: int) -> BaseTokenInjection:
-        return CLSTokenInjection(embed_dim=embed_dim)
+    def create_from_config(config: dict, execution_state: ExecutionState) -> BaseTokenInjection:
+        return CLSTokenInjection(execution_state=execution_state)

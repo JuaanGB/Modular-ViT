@@ -1,1 +1,2 @@
 epoch,train_loss,train_acc,test_loss,test_acc,epoch_time_sec,inference_time_ms_per_sample,max_vram_mb,model_flops,model_params
+1,2.7344,31.9,1.9042,34.28,1514.57,5.5166,0.0,N/A,85655818

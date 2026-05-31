@@ -36,5 +36,5 @@ class BaseTokenInjection(nn.Module):
         raise NotImplementedError
     
     @staticmethod
-    def create_from_config(config: dict, embed_dim: int) -> "BaseTokenInjection":
+    def create_from_config(config: dict) -> "BaseTokenInjection":
         raise NotImplementedError
