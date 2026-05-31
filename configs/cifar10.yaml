@@ -1,0 +1,32 @@
+dataset:
+  name: "CIFAR10"
+  in_channels: 3  # Para PatchEmbedding
+  img_size: 32    # Para PatchEmbedding
+
+training:
+  batch_size: 64
+  lr: 0.001
+  epochs: 5
+  weight_decay: 0.05
+
+model:
+  name: "MNIST-ViTBase"
+  embed_dim: 768 # Para PatchEmbedding, PositionalEncoding, TokenInjection
+  # Resto de hiperparámetros (num_heads, depth, etc.)
+
+  patch_embedding:
+    type: "vanilla"
+    size: 8
+
+  token_injection:
+    type: "cls"
+
+  positional_encoding:
+    type: "learnable"
+    # num_tokens: ¿Lo calculamos o que lo calcule el usuario y lo ponga?
+
+  aggregation:
+    type: "cls"  
+
+  attention:
+    # ... Futuros parámetros para introducir rotaciones

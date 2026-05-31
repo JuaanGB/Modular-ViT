@@ -8,9 +8,10 @@ from models.encoder.attention import ModularAttention # El bloque encoder usará
 
 from models.patch_embedding.vanilla import VanillaPatchEmbedding
 from models.token_injection.cls import CLSTokenInjection
-from models.positional_encoding.learnable import LearnablePositionalEncoding
+from models.positional_encoding.absolute import Absolute2DPositionalEncoding
 from models.encoder.encoder_block import TransformerEncoderBlock
 from models.aggregation.cls import CLSAggregation
+from models.ExecutionState import ExecutionState
 
 class ModularViT(nn.Module):
     def __init__(
@@ -35,14 +36,31 @@ class ModularViT(nn.Module):
         self.head = nn.Linear(patch_embedding.embed_dim, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # 1. Fragmentación en parches
-        x = self.patch_embedding(x)
+        # x: [B, C, H, W] (Imágenes de entrada)
         
-        # 2. Inyección de tokens ([CLS] o ninguno)
-        x = self.token_injection(x)
+        # --- PASO 1: Parcheado ---
+        # Pasamos de imágenes a parches planos y sus coordenadas (i, j) originales
+        # Salida: features [B, N, D] y coords [B, N, 2]
+        patch_out = self.patch_embedding(x)
         
-        # 3. Codificación posicional (Aditiva o pasiva)
-        x = self.positional_encoding(x)
+        # --- PASO 2: Estrategia de Tokens (¡Tu nuevo módulo!) ---
+        # Añade el token [CLS] al principio y desplaza todas las coordenadas
+        # Salida: features [B, N+1, D] y coords [B, N+1, 2] donde el CLS tiene (-1, -1)
+        # Previa lazy_load para inicializar valores globales
+        self.token_injection.lazy_load()
+        token_out = self.token_injection(patch_out.features, patch_out.coords)
+        
+        # --- PASO 3: Codificación Posicional ---
+        # El codificador recibe las coordenadas ya desplazadas [B, N', 2]
+        # Devuelve un embedding para cada posición, incluyendo la del CLS (-1, -1)
+        # Salida: [B, N+1, D]
+        # Previa lazy_load para inicializar valores globales
+        self.positional_encoding.lazy_load()
+        pos_embeddings = self.positional_encoding(token_out.coords)
+        
+        # --- PASO 4: Combinación ---
+        # Sumamos los embeddings de posición a los parches de características + CLS (si fuese la estrategia)
+        x = token_out.features + pos_embeddings  # [B, N', D]
         
         # Extraer frecuencias si el método es relacional (como RoPE)
         rope_freqs = self.positional_encoding.get_rope_frequencies(x)
@@ -63,12 +81,16 @@ def create_vanilla_vit_base(img_size: int = 224, num_classes: int = 10) -> Modul
     """Instancia la arquitectura exacta de ViT-Base/16 original de 2020."""
     embed_dim = 768
     patch_size = 16
+    execution_state = ExecutionState()
     
-    patch_emb = VanillaPatchEmbedding(img_size=img_size, patch_size=patch_size, embed_dim=embed_dim)
-    tok_inj = CLSTokenInjection(embed_dim=embed_dim)
+    # 1. Patch Embedding
+    patch_emb = VanillaPatchEmbedding(img_size=img_size, patch_size=patch_size, embed_dim=embed_dim, in_channels=3, execution_state=execution_state)
+
+    # 2. Mecanismo de token injection
+    tok_inj = CLSTokenInjection(execution_state=execution_state)
     
-    # Num patches (196) + 1 CLS = 197 tokens max
-    pos_enc = LearnablePositionalEncoding(embed_dim=embed_dim, max_tokens=patch_emb.num_patches + 1)
+    # 3. Mecanismo de PE
+    pos_enc = Absolute2DPositionalEncoding(execution_state=execution_state)
     
     # ViT-Base cuenta con 12 bloques idénticos de codificación
     encoder_blocks = nn.ModuleList([

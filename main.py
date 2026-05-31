@@ -6,17 +6,18 @@ import torch.optim as optim
 
 # Importamos nuestros módulos propios
 from utils.loader import get_data_loaders
-from models.vit import create_vanilla_vit_base
+from utils.yaml import *
 from utils.tracker import ExperimentTracker
+from models.vit import create_vanilla_vit_base
 
-def run_experiment(
-    dataset_name: str = "CIFAR10",
-    batch_size: int = 64,
-    epochs: int = 5,
-    learning_rate: float = 5e-4,
-    img_size: int = 224
-):
-    # 1. Configuración del dispositivo (Garantizar uso de GPU si está disponible)
+def run_experiment(config_path: str):
+    
+    # Parseo y extracción de datos desde el YAML
+    config = parse_yaml_config(config_path)
+    dataset_name, batch_size, img_size = get_dataset_info(config)
+    epochs, learning_rate, weight_decay = get_training_info(config)
+
+    # Configuración del dispositivo
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[*] Ejecutando experimento en el dispositivo: {device}")
 
@@ -32,14 +33,14 @@ def run_experiment(
         img_size=img_size
     )
 
-    # 3. Inicialización de la Arquitectura Modular (ViT-Base original)
-    print("[*] Inicializando Modular Vision Transformer (ViT-Base/16)...")
+    # 3. Inicialización de la Arquitectura Modular
+    print("[*] Inicializando Modular Vision Transformer...")
     model = create_vanilla_vit_base(img_size=img_size, num_classes=num_classes)
     model = model.to(device)
 
     # 4. Definición de la función de pérdida y optimizador clásico
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.05)
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     
     print(f"[*] Inicio del bucle de entrenamiento ({epochs} épocas)...")
     print("-" * 70)
@@ -158,8 +159,5 @@ if __name__ == "__main__":
     # Parámetros por defecto para validar el funcionamiento de la Fase 1
     # Puedes cambiar "CIFAR10" por "MNIST" si quieres una prueba ultrarrápida en CPU
     run_experiment(
-        dataset_name="CIFAR10", 
-        batch_size=64, 
-        epochs=5, 
-        learning_rate=5e-4
+        "configs/cifar10.yaml"
     )
