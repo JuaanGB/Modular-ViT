@@ -7,9 +7,12 @@ from models.vit import ModularViT
 from models.patch_embedding.vanilla import VanillaPatchEmbedding
 from models.token_injection.cls import CLSTokenInjection
 from models.positional_encoding.absolute import Absolute2DPositionalEncoding
+from models.encoder.encoder_block import TransformerEncoderBlock
 from models.aggregation.cls import CLSAggregation
 
 from models.ExecutionState import ExecutionState
+
+import torch.nn as nn
 
 PATCH_MECHANISMS = {
     "vanilla": VanillaPatchEmbedding,
@@ -27,7 +30,7 @@ POSITIONAL_ENCODING_MECHANISMS = {
     # "weierstrass": WeierstrassPositionalEncoding
 }
 
-AGGREGATION_MECHANISM = {
+AGGREGATION_MECHANISMS = {
     "cls": CLSAggregation,
     # "mean": MeanAgregation
 }
@@ -89,44 +92,79 @@ def create_vit_from_config(config: dict) -> ModularViT:
         print("[-] ERROR al parsear el archivo YAML: Falta el bloque obligatorio 'model'")
         sys.exit(1)
 
-    # Creación del ExecutionState que compartirán las diferentes fases
-    execucion_state = ExecutionState()
+    # 1. Inicialización del ExecutionState (centralización de atributos globales entre fases de tokenización)
+    execution_state = ExecutionState()
 
-    # Creación de mecanismo de PatchEmbedding
-    patch_type = model_cfg.get("patch_embedding", None).get("type", None)
+    # 2. Extraer Hiperparámetros
+    img_size = dataset_cfg.get("img_size", 224)
+    in_channels = dataset_cfg.get("in_channels", 3)
+    num_classes = dataset_cfg.get("num_classes", 10)
 
-    img_size = dataset_cfg.get("img_size", 0)
-    in_channels = dataset_cfg.get("in_channels", 0)
-    embed_dim = model_cfg.get("embed_dim", 0)
+    embed_dim = model_cfg.get("embed_dim", 768)
+    depth = model_cfg.get("depth", 12)
+    num_heads = model_cfg.get("num_heads", 12)
+    mlp_ratio = model_cfg.get("mlp_ratio", 4.0)
+
+    # 3. Creación del mecanismo de PatchEmbedding
+    patch_cfg = model_cfg.get("patch_embedding", {})
+    patch_type = patch_cfg.get("type", "vanilla")
+    
     patch_mechanism = PATCH_MECHANISMS[patch_type].create_from_config(
-        config=model_cfg.get("patch_embedding", {}), 
+        config=patch_cfg, 
         img_size=img_size, 
         in_channels=in_channels, 
         embed_dim=embed_dim,
-        execucion_state=execucion_state
+        execution_state=execution_state
     )
+    print(f"\t-> Patch Embedding empleado: {patch_type}")
 
-    # Creación de mecanismo de TokenInjection
-    token_type = model_cfg.get("token_injection", None).get("type", None)
+    # 4. Creación del mecanismo de TokenInjection
+    token_cfg = model_cfg.get("token_injection", {})
+    token_type = token_cfg.get("type", "cls")
 
     token_injection_mechanism = TOKEN_INJECTION_MECHANISMS[token_type].create_from_config(
-        config=model_cfg.get("token_injection", {}),
-        execution_state=execucion_state
+        config=token_cfg,
+        execution_state=execution_state
     )
-    
-    # Creación de mecanismo PositionalEncoding
-    pos_encoding_type = model_cfg.get("positional_encoding", None).get("type", None)
-    pos_encoding_mechanism = POSITIONAL_ENCODING_MECHANISMS[pos_encoding_type].create_from_config(
-        config=model_cfg.get("positional_encoding", {}),
-        execution_state=execucion_state
-    )
+    print(f"\t-> Token Injection empleado: {token_type}")
 
-    # Devolvemos el ViT Modular creado
+    # 5. Creación del mecanismo de PositionalEncoding
+    pos_cfg = model_cfg.get("positional_encoding", {})
+    pos_encoding_type = pos_cfg.get("type", "absolute")
+    
+    pos_encoding_mechanism = POSITIONAL_ENCODING_MECHANISMS[pos_encoding_type].create_from_config(
+        config=pos_cfg,
+        execution_state=execution_state
+    )
+    print(f"\t-> Positional Encoding empleado: {pos_encoding_type}")
+    
+    # 6. Creación dinámica de la lista de Bloques del Transformer (Encoder Blocks)
+    # Aquí pasamos los hiperparámetros que leídos del YAML
+    encoder_blocks = nn.ModuleList([
+        TransformerEncoderBlock(
+            embed_dim=embed_dim, 
+            num_heads=num_heads, 
+            mlp_ratio=mlp_ratio
+        )
+        for _ in range(depth)
+    ])
+
+    # 7. Creación del mecanismo de Agregación (CLS o Mean Pooling)
+    agg_cfg = model_cfg.get("aggregation", {})
+    agg_type = agg_cfg.get("type", "cls")
+    
+    aggregation_mechanism = AGGREGATION_MECHANISMS[agg_type].create_from_config(
+        config=agg_cfg,
+        execution_state=execution_state
+    )
+    print(f"\t-> Aggregation empleado: {agg_type}")
+
+    # 8. Devolvemos el ViT Modular creado
     return ModularViT(
         patch_embedding=patch_mechanism,
         token_injection=token_injection_mechanism,
-        positional_encoding=pos_encoding_mechanism
-        #encoder_blocks: nn.ModuleList, # Lista de bloques que usan ModularAttention
-        #aggregation: BaseAggregation,
-        #num_classes: int
+        positional_encoding=pos_encoding_mechanism,
+        encoder_blocks=encoder_blocks,
+        aggregation=aggregation_mechanism,
+        num_classes=num_classes
     )

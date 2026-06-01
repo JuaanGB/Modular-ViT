@@ -1,7 +1,7 @@
 dataset:
   name: "CIFAR10"
-  in_channels: 3  # Para PatchEmbedding
-  img_size: 32    # Para PatchEmbedding
+  in_channels: 3
+  img_size: 32
 
 training:
   batch_size: 64
@@ -11,7 +11,7 @@ training:
 
 model:
   name: "CIFAR10-ViTBase"
-  embed_dim: 256 # Para PatchEmbedding, PositionalEncoding, TokenInjection
+  embed_dim: 192
   depth: 12
   num_heads: 12
   mlp_ratio: 4.0
@@ -24,10 +24,10 @@ model:
     type: "cls"
 
   positional_encoding:
-    type: "learnable"
-
-  aggregation:
-    type: "cls"  
+    type: "absolute"
 
   attention:
     type: "vanilla"
+
+  aggregation:
+    type: "cls"  

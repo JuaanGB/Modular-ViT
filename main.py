@@ -7,7 +7,6 @@ import torch.optim as optim
 from utils.loader import get_data_loaders
 from utils.yaml import *
 from utils.tracker import ExperimentTracker
-from models.vit import create_vanilla_vit_base
 
 
 def run_experiment(config_path: str):
@@ -20,7 +19,7 @@ def run_experiment(config_path: str):
     print(f"[*] Ejecutando experimento en el dispositivo: {device}")
 
     experiment_name = f"vanilla_vit_{dataset_name.lower()}_bs{batch_size}_lr{learning_rate}"
-    tracker = ExperimentTracker(experiment_name=experiment_name)
+    tracker = ExperimentTracker(experiment_name=experiment_name, img_size=img_size, batch_size=batch_size)
 
     print(f"[*] Cargando el conjunto de datos: {dataset_name}...")
     train_loader, test_loader, num_classes = get_data_loaders(
@@ -30,7 +29,7 @@ def run_experiment(config_path: str):
     )
 
     print("[*] Inicializando Modular Vision Transformer...")
-    model = create_vanilla_vit_base(img_size=img_size, num_classes=num_classes)
+    model = create_vit_from_config(config)
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -45,9 +44,9 @@ def run_experiment(config_path: str):
         print(f"\n[>] Iniciando Época [{epoch}/{epochs}]")
         print("-" * 40)
 
-        # =========================
-        # TRAIN (con dropout)
-        # =========================
+        # =====================================================================
+        # 1. TRAIN (Bucle único de entrenamiento)
+        # =====================================================================
         model.train()
         train_loss = 0.0
         train_correct = 0
@@ -71,28 +70,10 @@ def run_experiment(config_path: str):
         epoch_train_loss = train_loss / train_total
         epoch_train_acc = 100 * train_correct / train_total
 
-        # =========================
-        # TRAIN EVAL (SIN dropout)
-        # =========================
+        # =====================================================================
+        # 2. TEST (Evaluación en el conjunto de validación/test)
+        # =====================================================================
         model.eval()
-        train_eval_correct = 0
-        train_eval_total = 0
-
-        with torch.no_grad():
-            for images, targets in train_loader:
-                images, targets = images.to(device), targets.to(device)
-
-                outputs = model(images)
-                preds = outputs.argmax(dim=1)
-
-                train_eval_correct += (preds == targets).sum().item()
-                train_eval_total += images.size(0)
-
-        train_eval_acc = 100 * train_eval_correct / train_eval_total
-
-        # =========================
-        # TEST (SIN dropout)
-        # =========================
         test_loss = 0.0
         test_correct = 0
         test_total = 0
@@ -121,9 +102,9 @@ def run_experiment(config_path: str):
         epoch_duration = epoch_end_time - epoch_start_time
         inference_time_per_sample = ((test_end_time - test_start_time) * 1000) / test_total
 
-        # =========================
-        # LOG
-        # =========================
+        # =====================================================================
+        # LOG (Quitamos la variable train_eval_acc que ya no existe)
+        # =====================================================================
         tracker.log_epoch(
             epoch=epoch,
             train_loss=epoch_train_loss,
@@ -138,8 +119,7 @@ def run_experiment(config_path: str):
         print(
             f"Época [{epoch}/{epochs}] ({epoch_duration:.2f}s) -> "
             f"Train Loss: {epoch_train_loss:.4f} | "
-            f"Train Acc: {epoch_train_acc:.2f}% | "
-            f"Train Eval Acc: {train_eval_acc:.2f}% || "
+            f"Train Acc: {epoch_train_acc:.2f}% || "
             f"Test Loss: {epoch_test_loss:.4f} | "
             f"Test Acc: {epoch_test_acc:.2f}% | "
             f"Inferencia: {inference_time_per_sample:.3f}ms/img"
