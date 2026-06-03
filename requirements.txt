@@ -1,0 +1,9 @@
+fvcore==0.1.5.post20221221
+matplotlib==3.10.8
+numpy==2.4.4
+pandas==3.0.3
+PyYAML==6.0.3
+iopath==0.1.10
+yacs==0.1.8
+tqdm==4.67.3
+# Sin torch ni torchvision porque ya vienen en la imagen base

@@ -1,0 +1,9 @@
+services:
+  vit:
+    build: .
+    working_dir: /workspace
+
+    volumes:
+      - .:/workspace
+
+    gpus: all
