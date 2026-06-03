@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter.font as tkfont
+import colorsys
 
 # ==========================================
 # CONFIGURACIÓN DE MÉTRICAS Y TIPOS DE GRÁFICO
@@ -21,7 +22,11 @@ METRIC_CONFIG = {
     "model_params": {"label": "Model Parameters", "type": "bar"}
 }
 
-COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+# Tus 5 colores base preferidos
+BASE_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+
+# Constante de la proporción áurea para la dispersión de color
+GOLDEN_RATIO_CONJUGATE = 0.618033988749895
 
 # ==========================================
 # CLASE AUXILIAR PARA TOOLTIPS (HOVER)
@@ -62,28 +67,43 @@ class AppVisualizador:
         self.root.title("Visualizador de Métricas - TFG")
         self.root.geometry("1050x850")
         
-        self.loaded_files = {}  # path: {"name": str, "df": DataFrame}
+        # Estructura: { file_path: {"name": str, "df": DataFrame, "color": str} }
+        self.loaded_files = {}  
         self.current_metric = "train_loss"
         
-        # Fuente para poder medir el ancho del texto en píxeles de forma exacta
-        self.label_font = tkfont.Font(family="Arial", size=9, weight="bold")
+        # Contador interno para saber cuántos archivos históricos se han agregado
+        # y así asignar colores únicos secuenciales que no se repitan al borrar/añadir
+        self.color_counter = 0 
         
+        self.label_font = tkfont.Font(family="Arial", size=9, weight="bold")
         self.setup_ui()
+
+    def generate_next_color(self):
+        """Genera un color persistente e individual usando la sección áurea."""
+        # Si estamos dentro de los primeros 5, respetamos tu paleta original
+        if self.color_counter < len(BASE_COLORS):
+            color = BASE_COLORS[self.color_counter]
+        else:
+            # A partir del 6º, usamos dispersión áurea sobre el círculo cromático
+            # Empezamos desplazados para no solapar los primeros colores
+            hue = (0.15 + self.color_counter * GOLDEN_RATIO_CONJUGATE) % 1.0
+            r, g, b = colorsys.hsv_to_rgb(hue, 0.85, 0.75)
+            color = f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+            
+        self.color_counter += 1
+        return color
 
     def setup_ui(self):
         # 1. Zona Superior: Panel de Control de Archivos
         top_frame = tk.Frame(self.root, pady=10, padx=10)
         top_frame.pack(fill=tk.X, side=tk.TOP)
         
-        # Botón Añadir directamente al top_frame, forzando fill=tk.Y para ocupar todo el alto
-        btn_add = tk.Button(top_frame, text="+ Añadir\nCSV", command=self.load_file, 
+        btn_add = tk.Button(top_frame, text="+\nAñadir\nCSV", command=self.load_file, 
                             bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), 
                             width=12, relief=tk.FLAT, bd=0, highlightthickness=0,
-                            activebackground="#3e8e41",  # <-- Verde oscuro al pasar el ratón / pulsar
-                            activeforeground="white")    # <-- Mantiene el texto blanco al pulsar
+                            activebackground="#3e8e41", activeforeground="white")
         btn_add.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         
-        # Contenedor con Scrollbar VERTICAL para las tarjetas de archivos (mismo alto)
         scroll_canvas = tk.Canvas(top_frame, height=100, highlightthickness=1, relief=tk.SUNKEN)
         scrollbar = tk.Scrollbar(top_frame, orient="vertical", command=scroll_canvas.yview)
         
@@ -109,7 +129,7 @@ class AppVisualizador:
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.chart_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-        # 3. Zona Inferior: Selectores de Métrica (Botones negros minimalistas)
+        # 3. Zona Inferior: Selectores de Métrica (Botones)
         bottom_frame = tk.Frame(self.root, pady=10)
         bottom_frame.pack(fill=tk.X, side=tk.BOTTOM)
         
@@ -145,7 +165,10 @@ class AppVisualizador:
                 df['model_flops'] = df['model_flops'].astype(str).str.replace(' MFLOPs', '', case=False).str.strip().astype(float)
                 
             filename = os.path.basename(file_path)
-            self.loaded_files[file_path] = {"name": filename, "df": df}
+            
+            # ASIGNACIÓN ÚNICA: El color se genera una sola vez y se guarda con el archivo
+            assigned_color = self.generate_next_color()
+            self.loaded_files[file_path] = {"name": filename, "df": df, "color": assigned_color}
             
             self.refresh_file_tags()
             self.update_plot()
@@ -155,6 +178,9 @@ class AppVisualizador:
     def remove_file(self, file_path):
         if file_path in self.loaded_files:
             del self.loaded_files[file_path]
+            # Si eliminas todos los archivos, reiniciamos el contador para volver a usar el azul inicial
+            if not self.loaded_files:
+                self.color_counter = 0
             self.refresh_file_tags()
             self.update_plot()
 
@@ -162,10 +188,14 @@ class AppVisualizador:
         for widget in self.files_container.winfo_children():
             widget.destroy()
             
-        for i, (path, info) in enumerate(self.loaded_files.items()):
+        for path, info in self.loaded_files.items():
             full_name = info["name"]
-            bg_color = COLORS[i % len(COLORS)]
-            fg_color = "black" if bg_color in ["#ff7f0e"] else "white"
+            bg_color = info["color"] # Usamos el color estático guardado en el diccionario
+            
+            # Contraste de texto inteligente según luminancia
+            r, g, b = int(bg_color[1:3], 16), int(bg_color[3:5], 16), int(bg_color[5:7], 16)
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            fg_color = "black" if luminance > 0.6 else "white"
             
             tag = tk.Frame(self.files_container, bg=bg_color, relief=tk.RAISED, bd=1, padx=10, pady=4)
             tag.pack(fill=tk.X, pady=2, padx=2, expand=True)
@@ -186,11 +216,9 @@ class AppVisualizador:
                 available_width = event.width - 45
                 if available_width <= 20: 
                     return
-                
                 if self.label_font.measure(text) <= available_width:
                     label.config(text=text)
                     return
-                
                 for length in range(len(text), 0, -1):
                     proposed_text = text[:length] + "..."
                     if self.label_font.measure(proposed_text) <= available_width:
@@ -219,9 +247,9 @@ class AppVisualizador:
         self.ax.set_axis_on()
         
         if graph_type == "line":
-            for i, (path, info) in enumerate(self.loaded_files.items()):
+            for path, info in self.loaded_files.items():
                 df = info["df"]
-                color = COLORS[i % len(COLORS)]
+                color = info["color"] # Mismo color estático para la línea
                 
                 if 'epoch' in df.columns and self.current_metric in df.columns:
                     self.ax.plot(df['epoch'], df[self.current_metric], marker='o', 
@@ -236,13 +264,13 @@ class AppVisualizador:
             values = []
             colors = []
             
-            for i, (path, info) in enumerate(self.loaded_files.items()):
+            for path, info in self.loaded_files.items():
                 df = info["df"]
                 if self.current_metric in df.columns:
                     short_name = info["name"] if len(info["name"]) <= 25 else info["name"][:22] + "..."
                     names.append(short_name)
                     values.append(df[self.current_metric].iloc[-1])
-                    colors.append(COLORS[i % len(COLORS)])
+                    colors.append(info["color"]) # Mismo color estático para la barra
             
             if values:
                 x_positions = range(len(names))
