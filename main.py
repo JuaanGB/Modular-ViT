@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 import torch
@@ -131,4 +132,10 @@ def run_experiment(config_path: str):
 
 
 if __name__ == "__main__":
-    run_experiment("configs/cifar10.yaml")
+    parser = argparse.ArgumentParser(
+        description="Entrena un Modular ViT"
+    )
+    parser.add_argument("--config", type=str, required=True, help="Ruta al fichero YAML que contiene la configuración del experimento")
+    args = parser.parse_args()
+
+    run_experiment(args.config)
