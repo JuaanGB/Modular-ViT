@@ -8,9 +8,12 @@ import torch.optim as optim
 from utils.loader import get_data_loaders
 from utils.yaml import *
 from utils.tracker import ExperimentTracker
+from utils.seed import set_seed
 
 
 def run_experiment(config_path: str):
+
+    set_seed(2026, deterministic=True)
 
     config = parse_yaml_config(config_path)
     dataset_name, batch_size, img_size = get_dataset_info(config)
@@ -43,8 +46,7 @@ def run_experiment(config_path: str):
     for epoch in range(1, epochs + 1):
         epoch_start_time = time.time()
 
-        print(f"\n[>] Iniciando Época [{epoch}/{epochs}]")
-        print("-" * 40)
+        print(f"\n[>] Época {epoch}/{epochs}: ", end="")
 
         # =====================================================================
         # 1. TRAIN (Bucle único de entrenamiento)
@@ -119,9 +121,8 @@ def run_experiment(config_path: str):
         )
 
         print(
-            f"Época [{epoch}/{epochs}] ({epoch_duration:.2f}s) -> "
             f"Train Loss: {epoch_train_loss:.4f} | "
-            f"Train Acc: {epoch_train_acc:.2f}% || "
+            f"Train Acc: {epoch_train_acc:.2f}% | "
             f"Test Loss: {epoch_test_loss:.4f} | "
             f"Test Acc: {epoch_test_acc:.2f}% | "
             f"Inferencia: {inference_time_per_sample:.3f}ms/img"
