@@ -2,6 +2,7 @@ import os
 import csv
 import torch
 import torch.nn as nn
+from utils.fvcore_unsupported_ops import add_custom_flop_handlers
 
 try:
     from fvcore.nn import FlopCountAnalysis
@@ -60,7 +61,9 @@ class ExperimentTracker:
             model.eval()
 
             with torch.no_grad():
-                flops = FlopCountAnalysis(model, example_input).total()
+                flopsCount = FlopCountAnalysis(model, example_input)
+                add_custom_flop_handlers(flopsCount)
+                flops = flopsCount.total()
 
         except Exception as e:
             print(f"[ExperimentTracker] Error calculando FLOPs: {e}")
