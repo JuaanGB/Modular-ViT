@@ -76,7 +76,8 @@ class ModularViT(nn.Module):
 
         return (
             f"ViT_{dataset}_"
-            f"{type(self.patch_embedding).__name__}_"
+            f"embeddim{self.patch_embedding.embed_dim}_"
+            f"{type(self.patch_embedding).__name__}_patchsize{self.patch_embedding.patch_size}_"
             f"{type(self.token_injection).__name__}_"
             f"{type(self.positional_encoding).__name__}_"
             f"{type(self.aggregation).__name__}_"
