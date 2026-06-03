@@ -18,7 +18,10 @@ def run_experiment(config_path: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[*] Ejecutando experimento en el dispositivo: {device}")
 
-    experiment_name = f"vanilla_vit_{dataset_name.lower()}_bs{batch_size}_lr{learning_rate}"
+    print("[*] Inicializando Modular Vision Transformer...")
+    model = create_vit_from_config(config)
+    experiment_name = model.get_experiment_name(dataset_name)
+
     tracker = ExperimentTracker(experiment_name=experiment_name, img_size=img_size, batch_size=batch_size)
 
     print(f"[*] Cargando el conjunto de datos: {dataset_name}...")
@@ -28,8 +31,6 @@ def run_experiment(config_path: str):
         img_size=img_size
     )
 
-    print("[*] Inicializando Modular Vision Transformer...")
-    model = create_vit_from_config(config)
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()

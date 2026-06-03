@@ -1,17 +1,12 @@
 import torch
 import torch.nn as nn
+from datetime import datetime
+
 from models.patch_embedding.base import BasePatchEmbedding
 from models.token_injection.base import BaseTokenInjection
 from models.positional_encoding.base import BasePositionalEncoding
 from models.aggregation.base import BaseAggregation
 from models.encoder.attention import ModularAttention # El bloque encoder usará esta atención
-
-from models.patch_embedding.vanilla import VanillaPatchEmbedding
-from models.token_injection.cls import CLSTokenInjection
-from models.positional_encoding.absolute import Absolute2DPositionalEncoding
-from models.encoder.encoder_block import TransformerEncoderBlock
-from models.aggregation.cls import CLSAggregation
-from models.ExecutionState import ExecutionState
 
 class ModularViT(nn.Module):
     def __init__(
@@ -76,35 +71,14 @@ class ModularViT(nn.Module):
         # 6. Clasificación final
         return self.head(global_features)
     
+    def get_experiment_name(self, dataset: str) -> str:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def create_vanilla_vit_base(img_size: int = 224, num_classes: int = 10) -> ModularViT:
-    """Instancia la arquitectura exacta de ViT-Base/16 original de 2020."""
-    embed_dim = 768
-    patch_size = 16
-    execution_state = ExecutionState()
-    
-    # 1. Patch Embedding
-    patch_emb = VanillaPatchEmbedding(img_size=img_size, patch_size=patch_size, embed_dim=embed_dim, in_channels=3, execution_state=execution_state)
-
-    # 2. Mecanismo de token injection
-    tok_inj = CLSTokenInjection(execution_state=execution_state)
-    
-    # 3. Mecanismo de PE
-    pos_enc = Absolute2DPositionalEncoding(execution_state=execution_state)
-    
-    # ViT-Base cuenta con 12 bloques idénticos de codificación
-    encoder_blocks = nn.ModuleList([
-        TransformerEncoderBlock(embed_dim=embed_dim, num_heads=12, mlp_ratio=4.0)
-        for _ in range(12)
-    ])
-    
-    agg = CLSAggregation(has_cls_token=True)
-    
-    return ModularViT(
-        patch_embedding=patch_emb,
-        token_injection=tok_inj,
-        positional_encoding=pos_enc,
-        encoder_blocks=encoder_blocks,
-        aggregation=agg,
-        num_classes=num_classes
-    )
+        return (
+            f"ViT_{dataset}_"
+            f"{type(self.patch_embedding).__name__}_"
+            f"{type(self.token_injection).__name__}_"
+            f"{type(self.positional_encoding).__name__}_"
+            f"{type(self.aggregation).__name__}_"
+            f"{timestamp}"
+        )
