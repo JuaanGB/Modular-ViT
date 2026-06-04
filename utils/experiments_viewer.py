@@ -22,10 +22,7 @@ METRIC_CONFIG = {
     "model_params": {"label": "Model Parameters", "type": "bar"}
 }
 
-# Tus 5 colores base preferidos
 BASE_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
-
-# Constante de la proporción áurea para la dispersión de color
 GOLDEN_RATIO_CONJUGATE = 0.618033988749895
 
 # ==========================================
@@ -67,25 +64,18 @@ class AppVisualizador:
         self.root.title("Visualizador de Métricas - TFG")
         self.root.geometry("1050x850")
         
-        # Estructura: { file_path: {"name": str, "df": DataFrame, "color": str} }
+        # Estructura: { file_path: {"name": str, "df": DataFrame, "color": str, "alias_var": tk.StringVar} }
         self.loaded_files = {}  
         self.current_metric = "train_loss"
-        
-        # Contador interno para saber cuántos archivos históricos se han agregado
-        # y así asignar colores únicos secuenciales que no se repitan al borrar/añadir
         self.color_counter = 0 
         
         self.label_font = tkfont.Font(family="Arial", size=9, weight="bold")
         self.setup_ui()
 
     def generate_next_color(self):
-        """Genera un color persistente e individual usando la sección áurea."""
-        # Si estamos dentro de los primeros 5, respetamos tu paleta original
         if self.color_counter < len(BASE_COLORS):
             color = BASE_COLORS[self.color_counter]
         else:
-            # A partir del 6º, usamos dispersión áurea sobre el círculo cromático
-            # Empezamos desplazados para no solapar los primeros colores
             hue = (0.15 + self.color_counter * GOLDEN_RATIO_CONJUGATE) % 1.0
             r, g, b = colorsys.hsv_to_rgb(hue, 0.85, 0.75)
             color = f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
@@ -104,7 +94,7 @@ class AppVisualizador:
                             activebackground="#3e8e41", activeforeground="white")
         btn_add.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         
-        scroll_canvas = tk.Canvas(top_frame, height=100, highlightthickness=1, relief=tk.SUNKEN)
+        scroll_canvas = tk.Canvas(top_frame, height=120, highlightthickness=1, relief=tk.SUNKEN)
         scrollbar = tk.Scrollbar(top_frame, orient="vertical", command=scroll_canvas.yview)
         
         self.files_container = tk.Frame(scroll_canvas)
@@ -165,10 +155,22 @@ class AppVisualizador:
                 df['model_flops'] = df['model_flops'].astype(str).str.replace(' MFLOPs', '', case=False).str.strip().astype(float)
                 
             filename = os.path.basename(file_path)
-            
-            # ASIGNACIÓN ÚNICA: El color se genera una sola vez y se guarda con el archivo
             assigned_color = self.generate_next_color()
-            self.loaded_files[file_path] = {"name": filename, "df": df, "color": assigned_color}
+            
+            # MAGIA NUEVA: Calcula el índice secuencial según los archivos cargados
+            next_index = len(self.loaded_files) + 1
+            default_alias = f"Gráfica {next_index}"
+            
+            # La variable reactiva ahora recibe el alias limpio e idóneo para la captura
+            alias_var = tk.StringVar(value=default_alias)
+            alias_var.trace_add("write", lambda *args: self.update_plot())
+            
+            self.loaded_files[file_path] = {
+                "name": filename, 
+                "df": df, 
+                "color": assigned_color,
+                "alias_var": alias_var
+            }
             
             self.refresh_file_tags()
             self.update_plot()
@@ -178,7 +180,6 @@ class AppVisualizador:
     def remove_file(self, file_path):
         if file_path in self.loaded_files:
             del self.loaded_files[file_path]
-            # Si eliminas todos los archivos, reiniciamos el contador para volver a usar el azul inicial
             if not self.loaded_files:
                 self.color_counter = 0
             self.refresh_file_tags()
@@ -189,15 +190,13 @@ class AppVisualizador:
             widget.destroy()
             
         for path, info in self.loaded_files.items():
-            full_name = info["name"]
-            bg_color = info["color"] # Usamos el color estático guardado en el diccionario
+            bg_color = info["color"]
             
-            # Contraste de texto inteligente según luminancia
             r, g, b = int(bg_color[1:3], 16), int(bg_color[3:5], 16), int(bg_color[5:7], 16)
             luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
             fg_color = "black" if luminance > 0.6 else "white"
             
-            tag = tk.Frame(self.files_container, bg=bg_color, relief=tk.RAISED, bd=1, padx=10, pady=4)
+            tag = tk.Frame(self.files_container, bg=bg_color, relief=tk.RAISED, bd=1, padx=10, pady=6)
             tag.pack(fill=tk.X, pady=2, padx=2, expand=True)
             
             btn_del = tk.Button(tag, text="X", command=lambda p=path: self.remove_file(p), 
@@ -207,25 +206,16 @@ class AppVisualizador:
                                 cursor="hand2", font=("Arial", 9, "bold"))
             btn_del.pack(side=tk.RIGHT, padx=(5, 0))
             
-            lbl = tk.Label(tag, text=full_name, bg=bg_color, fg=fg_color, font=self.label_font, anchor="w")
-            lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            lbl_prefix = tk.Label(tag, text="Etiqueta gráfica:", bg=bg_color, fg=fg_color, font=("Arial", 9, "normal"))
+            lbl_prefix.pack(side=tk.LEFT, padx=(0, 5))
             
-            ToolTip(lbl, full_name)
+            entry_name = tk.Entry(tag, textvariable=info["alias_var"], font=self.label_font,
+                                  bg=bg_color, fg=fg_color, bd=1, relief=tk.FLAT,
+                                  insertbackground=fg_color, highlightthickness=0)
+            entry_name.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
             
-            def ordenar_texto_dinamico(event, label=lbl, text=full_name):
-                available_width = event.width - 45
-                if available_width <= 20: 
-                    return
-                if self.label_font.measure(text) <= available_width:
-                    label.config(text=text)
-                    return
-                for length in range(len(text), 0, -1):
-                    proposed_text = text[:length] + "..."
-                    if self.label_font.measure(proposed_text) <= available_width:
-                        label.config(text=proposed_text)
-                        break
-
-            tag.bind("<Configure>", ordenar_texto_dinamico)
+            # El tooltip sigue manteniendo la traza del fichero largo original por seguridad
+            ToolTip(entry_name, f"Archivo original: {info['name']}\nRuta completa: {path}")
 
     def change_metric(self, metric_id):
         self.current_metric = metric_id
@@ -249,15 +239,17 @@ class AppVisualizador:
         if graph_type == "line":
             for path, info in self.loaded_files.items():
                 df = info["df"]
-                color = info["color"] # Mismo color estático para la línea
+                color = info["color"]
+                graph_alias = info["alias_var"].get()
                 
                 if 'epoch' in df.columns and self.current_metric in df.columns:
                     self.ax.plot(df['epoch'], df[self.current_metric], marker='o', 
-                                 linewidth=2, color=color)
+                                 linewidth=2, color=color, label=graph_alias)
             
             self.ax.set_xlabel("Epoch")
             self.ax.set_ylabel(metric_label)
             self.ax.grid(True, linestyle='--', alpha=0.6)
+            self.ax.legend(loc="best", fontsize=9, framealpha=0.8)
             
         elif graph_type == "bar":
             names = []
@@ -267,10 +259,10 @@ class AppVisualizador:
             for path, info in self.loaded_files.items():
                 df = info["df"]
                 if self.current_metric in df.columns:
-                    short_name = info["name"] if len(info["name"]) <= 25 else info["name"][:22] + "..."
-                    names.append(short_name)
+                    graph_alias = info["alias_var"].get()
+                    names.append(graph_alias)
                     values.append(df[self.current_metric].iloc[-1])
-                    colors.append(info["color"]) # Mismo color estático para la barra
+                    colors.append(info["color"])
             
             if values:
                 x_positions = range(len(names))

@@ -4,7 +4,10 @@ import sys
 import yaml
 
 from models.vit import ModularViT
+
 from models.patch_embedding.vanilla import VanillaPatchEmbedding
+from models.patch_embedding.adaptive import APTPatchEmbedding
+
 from models.token_injection.cls import CLSTokenInjection
 from models.positional_encoding.absolute import Absolute2DPositionalEncoding
 from models.encoder.encoder_block import TransformerEncoderBlock
@@ -16,7 +19,7 @@ import torch.nn as nn
 
 PATCH_MECHANISMS = {
     "vanilla": VanillaPatchEmbedding,
-    # "adaptive": AdaptivePatchEmbedding,
+    "adaptive": APTPatchEmbedding,
     # "cnn": CNNPatchEmbedding
 }
 
