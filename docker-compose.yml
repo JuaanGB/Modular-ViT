@@ -2,8 +2,12 @@ services:
   vit:
     build: .
     working_dir: /workspace
-
     volumes:
       - .:/workspace
-
-    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
