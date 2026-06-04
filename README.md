@@ -1,2 +1,2 @@
 # Modular-ViT
-Modular-ViT is a research-oriented PyTorch framework for Vision Transformers with fully interchangeable components such as patch embedding, positional encoding, token injection, attention, and aggregation. Designed for reproducible experimentation and architectural comparison.
+Modular-ViT es un framework de investigación en PyTorch para Vision Transformers con componentes totalmente intercambiables, como patch embedding, codificación posicional, inyección de tokens, atención y agregación. Diseñado para la experimentación reproducible y la comparación de arquitecturas.
