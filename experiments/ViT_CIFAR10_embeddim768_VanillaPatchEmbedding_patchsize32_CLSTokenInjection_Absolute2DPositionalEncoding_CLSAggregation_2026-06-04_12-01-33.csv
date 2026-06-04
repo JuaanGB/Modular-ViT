@@ -1,0 +1,2 @@
+epoch,train_loss,train_acc,test_loss,test_acc,epoch_time_sec,inference_time_ms_per_sample,max_vram_mb,model_flops,model_params
+1,2.9763,28.83,1.7199,37.17,387.4,2.7945,2350.11,4.43 GFLOPs,87429130
