@@ -152,7 +152,19 @@ class AppVisualizador:
         try:
             df = pd.read_csv(file_path)
             if 'model_flops' in df.columns:
-                df['model_flops'] = df['model_flops'].astype(str).str.replace(' MFLOPs', '', case=False).str.strip().astype(float)
+                # Convertimos a string para limpiar posibles sufijos de texto (' MFLOPs', ' GFLOPs', etc.)
+                raw_val = df['model_flops'].astype(str).str.upper()
+                
+                # Comprobamos cómo vienen los datos en tu CSV para convertirlos a GFLOPs (Base 10^9)
+                if raw_val.str.contains('MFLOPS').any():
+                    df['model_flops'] = raw_val.str.replace(' MFLOPS', '', regex=False).str.strip().astype(float) / 1000.0
+                elif raw_val.str.contains('GFLOPS').any():
+                    df['model_flops'] = raw_val.str.replace(' GFLOPS', '', regex=False).str.strip().astype(float)
+                else:
+                    # Si vienen como números planos en FLOPs (ej: 3200000000) lo pasamos a GFLOPs
+                    df['model_flops'] = pd.to_numeric(raw_val.str.replace(' FLOPS', '', regex=False).str.strip())
+                    if df['model_flops'].max() > 1e6: # Si el número es gigante, asumimos que venía en FLOPs puros
+                        df['model_flops'] = df['model_flops'] / 1e9
                 
             filename = os.path.basename(file_path)
             assigned_color = self.generate_next_color()
