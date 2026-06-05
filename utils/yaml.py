@@ -9,7 +9,10 @@ from models.patch_embedding.vanilla import VanillaPatchEmbedding
 from models.patch_embedding.adaptive import APTPatchEmbedding
 
 from models.token_injection.cls import CLSTokenInjection
+
 from models.positional_encoding.absolute import Absolute2DPositionalEncoding
+from models.positional_encoding.wepe import Weierstrass2DPositionalEncoding
+
 from models.encoder.encoder_block import TransformerEncoderBlock
 from models.aggregation.cls import CLSAggregation
 
@@ -29,6 +32,7 @@ TOKEN_INJECTION_MECHANISMS = {
 
 POSITIONAL_ENCODING_MECHANISMS = {
     "absolute": Absolute2DPositionalEncoding,
+    "wepe": Weierstrass2DPositionalEncoding,
     # "learnable": LearnablePositionalEncoding,
     # "weierstrass": WeierstrassPositionalEncoding
 }
