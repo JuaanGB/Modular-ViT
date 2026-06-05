@@ -11,7 +11,7 @@ objetivo de obtener una estimación más completa del coste computacional.
 
 Notas
 -----
-- Los FLOPs reportados por distintos artículos no siempre cuentan las mismas
+- Los FLOPs reportados por distintos artículos no siempre consideran las mismas
   operaciones.
 - Muchos trabajos de ViT ignoran softmax, GELU y operaciones element-wise.
 - Por tanto, los resultados obtenidos usando estos handlers pueden ser
@@ -74,6 +74,77 @@ def mul_flops(inputs, outputs):
     """
 
     return _numel_from_value(outputs[0])
+
+
+def div_flops(inputs, outputs):
+    """
+    aten::div
+
+    Cada división elemental se considera 1 FLOP (a nivel teórico de coste,
+    aunque en hardware suele ser más costosa que una multiplicación).
+
+    z = x / y
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+def rsub_flops(inputs, outputs):
+    """
+    aten::rsub (Reverse Subtraction)
+
+    Calcula: z = alpha * y - x (frecuentemente usado como 1 - x).
+    Suele costar 1 FLOP (si alpha=1) o 2 FLOPs (si hay multiplicación).
+    Para perfiles de ViT, contar una operación elemental (1 FLOP) es el estándar.
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+# ------------------------------------------------------------------
+# Trigonometric operators (Frecuentes en RoPE / Positional Embeddings)
+# ------------------------------------------------------------------
+
+def cos_flops(inputs, outputs):
+    """
+    aten::cos
+
+    Las funciones trascendentes varían según el hardware, pero en perfiles de 
+    redes neuronales se aproximan comúnmente como 1 FLOP elemental por elemento.
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+def sin_flops(inputs, outputs):
+    """
+    aten::sin
+
+    Similar a aten::cos, se cuenta como 1 FLOP por elemento.
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+# ------------------------------------------------------------------
+# Padding & Data Manipulation
+# ------------------------------------------------------------------
+
+def pad_flops(inputs, outputs):
+    """
+    aten::pad
+
+    El padding consiste en copiar elementos a un tensor más grande y rellenar 
+    con ceros o valores constantes. Al no haber operaciones aritméticas, 
+    se considera coste 0 en FLOPs (aunque penalice el ancho de banda de memoria).
+
+    FLOPs = 0
+    """
+    return 0
 
 
 # ------------------------------------------------------------------
@@ -167,6 +238,11 @@ def add_custom_flop_handlers(flops: FlopCountAnalysis):
         "aten::embedding", embedding_flops,
         "aten::add", add_flops,
         "aten::mul", mul_flops,
+        "aten::div", div_flops,
+        "aten::rsub", rsub_flops,
+        "aten::cos", cos_flops,
+        "aten::sin", sin_flops,
+        "aten::pad", pad_flops,
         "aten::softmax", softmax_flops,
         "aten::gelu", gelu_flops,
     )
