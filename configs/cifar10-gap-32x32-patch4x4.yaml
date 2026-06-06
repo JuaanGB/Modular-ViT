@@ -21,7 +21,7 @@ model:
     size: 4
 
   token_injection:
-    type: "cls"
+    type: "none"
 
   positional_encoding:
     type: "absolute"
@@ -30,4 +30,4 @@ model:
     type: "vanilla"
 
   aggregation:
-    type: "cls"  
+    type: "gap"  

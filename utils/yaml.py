@@ -9,12 +9,15 @@ from models.patch_embedding.vanilla import VanillaPatchEmbedding
 from models.patch_embedding.adaptive import APTPatchEmbedding
 
 from models.token_injection.cls import CLSTokenInjection
+from models.token_injection.none import IdentityTokenInjection
 
 from models.positional_encoding.absolute import Absolute2DPositionalEncoding
 from models.positional_encoding.wepe import Weierstrass2DPositionalEncoding
 
 from models.encoder.encoder_block import TransformerEncoderBlock
+
 from models.aggregation.cls import CLSAggregation
+from models.aggregation.gap import GAPAggregation
 
 from models.ExecutionState import ExecutionState
 
@@ -28,6 +31,7 @@ PATCH_MECHANISMS = {
 
 TOKEN_INJECTION_MECHANISMS = {
     "cls": CLSTokenInjection,
+    "none": IdentityTokenInjection
 }
 
 POSITIONAL_ENCODING_MECHANISMS = {
@@ -39,6 +43,7 @@ POSITIONAL_ENCODING_MECHANISMS = {
 
 AGGREGATION_MECHANISMS = {
     "cls": CLSAggregation,
+    "gap": GAPAggregation
     # "mean": MeanAgregation
 }
 
