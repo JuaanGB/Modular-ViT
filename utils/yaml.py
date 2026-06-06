@@ -18,6 +18,7 @@ from models.encoder.encoder_block import TransformerEncoderBlock
 
 from models.aggregation.cls import CLSAggregation
 from models.aggregation.gap import GAPAggregation
+from models.aggregation.gap_gmp import GAPGMPAggregation 
 
 from models.ExecutionState import ExecutionState
 
@@ -38,12 +39,12 @@ POSITIONAL_ENCODING_MECHANISMS = {
     "absolute": Absolute2DPositionalEncoding,
     "wepe": Weierstrass2DPositionalEncoding,
     # "learnable": LearnablePositionalEncoding,
-    # "weierstrass": WeierstrassPositionalEncoding
 }
 
 AGGREGATION_MECHANISMS = {
     "cls": CLSAggregation,
-    "gap": GAPAggregation
+    "gap": GAPAggregation,
+    "gap+gmp": GAPGMPAggregation
     # "mean": MeanAgregation
 }
 
