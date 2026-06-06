@@ -195,6 +195,29 @@ def softmax_flops(inputs, outputs):
 
     return 5 * numel
 
+# ------------------------------------------------------------------
+# Reducciones (Pooling)
+# ------------------------------------------------------------------
+
+def mean_flops(inputs, outputs):
+    """
+    aten::mean
+
+    Calcula la media aritmética a lo largo de una o varias dimensiones.
+    
+    Cómputo aproximado:
+      - Sumas: 1 FLOP por cada elemento del tensor de entrada (para acumular).
+      - Divisiones: 1 FLOP por cada elemento del tensor de salida (para promediar).
+      
+    FLOPs = numel(inputs) + numel(outputs)
+    """
+    # inputs[0] es el tensor de entrada que se va a promediar
+    numel_in = _numel_from_value(inputs[0])
+    # outputs[0] es el tensor resultante tras el pooling
+    numel_out = _numel_from_value(outputs[0])
+    
+    return numel_in + numel_out
+
 
 # ------------------------------------------------------------------
 # GELU
@@ -245,6 +268,7 @@ def add_custom_flop_handlers(flops: FlopCountAnalysis):
         "aten::pad", pad_flops,
         "aten::softmax", softmax_flops,
         "aten::gelu", gelu_flops,
+        "aten::mean", mean_flops,
     )
 
     return flops
