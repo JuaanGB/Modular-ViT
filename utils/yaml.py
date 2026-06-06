@@ -13,6 +13,7 @@ from models.token_injection.none import IdentityTokenInjection
 
 from models.positional_encoding.absolute import Absolute2DPositionalEncoding
 from models.positional_encoding.wepe import Weierstrass2DPositionalEncoding
+from models.positional_encoding.axial_rope import AxialRoPE
 
 from models.encoder.encoder_block import TransformerEncoderBlock
 
@@ -38,7 +39,7 @@ TOKEN_INJECTION_MECHANISMS = {
 POSITIONAL_ENCODING_MECHANISMS = {
     "absolute": Absolute2DPositionalEncoding,
     "wepe": Weierstrass2DPositionalEncoding,
-    # "learnable": LearnablePositionalEncoding,
+    "axial-rope": AxialRoPE
 }
 
 AGGREGATION_MECHANISMS = {
@@ -121,6 +122,10 @@ def create_vit_from_config(config: dict) -> ModularViT:
     # 3. Creación del mecanismo de PatchEmbedding
     patch_cfg = model_cfg.get("patch_embedding", {})
     patch_type = patch_cfg.get("type", "vanilla")
+
+    # Añadimos parámetros globales
+    execution_state.head_dim = embed_dim // num_heads
+    execution_state.num_heads = num_heads
     
     patch_mechanism = PATCH_MECHANISMS[patch_type].create_from_config(
         config=patch_cfg, 
@@ -179,5 +184,6 @@ def create_vit_from_config(config: dict) -> ModularViT:
         positional_encoding=pos_encoding_mechanism,
         encoder_blocks=encoder_blocks,
         aggregation=aggregation_mechanism,
-        num_classes=num_classes
+        num_classes=num_classes,
+        execution_state=execution_state   
     )

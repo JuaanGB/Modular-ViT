@@ -6,7 +6,7 @@ from models.patch_embedding.base import BasePatchEmbedding
 from models.token_injection.base import BaseTokenInjection
 from models.positional_encoding.base import BasePositionalEncoding
 from models.aggregation.base import BaseAggregation
-from models.encoder.attention import ModularAttention # El bloque encoder usará esta atención
+from models.ExecutionState import ExecutionState
 
 class ModularViT(nn.Module):
     def __init__(
@@ -16,7 +16,8 @@ class ModularViT(nn.Module):
         positional_encoding: BasePositionalEncoding,
         encoder_blocks: nn.ModuleList, # Lista de bloques que usan ModularAttention
         aggregation: BaseAggregation,
-        num_classes: int
+        num_classes: int,
+        execution_state: ExecutionState
     ):
         super().__init__()
         self.patch_embedding = patch_embedding
@@ -24,6 +25,7 @@ class ModularViT(nn.Module):
         self.positional_encoding = positional_encoding
         self.encoder_blocks = encoder_blocks
         self.aggregation = aggregation
+        self.execution_state = execution_state
         
         # Capa final de clasificación (Ajustable dinámicamente según la salida de la agregación)
         # Si usas GAP+GMP, la agregación devolverá embed_dim * 2, por eso calculamos dinámicamente.
@@ -44,7 +46,10 @@ class ModularViT(nn.Module):
         # Previa lazy_load para inicializar valores globales
         self.token_injection.lazy_load()
         token_out = self.token_injection(patch_out.features, patch_out.coords)
-        
+
+        # Ponemos las coordenadas en el execution state
+        self.execution_state.token_coords = token_out.coords
+
         # --- PASO 3: Codificación Posicional ---
         # El codificador recibe las coordenadas ya desplazadas [B, N', 2]
         # Devuelve un embedding para cada posición, incluyendo la del CLS (-1, -1)
@@ -58,7 +63,7 @@ class ModularViT(nn.Module):
         x = token_out.features + pos_embeddings  # [B, N', D]
         
         # Extraer frecuencias si el método es relacional (como RoPE)
-        rope_freqs = self.positional_encoding.get_rope_frequencies(x)
+        rope_freqs = self.positional_encoding.get_rope_frequencies()
 
         # 4. Paso por el Transformer Encoder pasando el gancho de la posición
         for block in self.encoder_blocks:

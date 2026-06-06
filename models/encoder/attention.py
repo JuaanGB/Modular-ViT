@@ -27,10 +27,27 @@ class ModularAttention(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2] # Cada uno: [B, num_heads, N, head_dim]
 
-        # --- AQUÍ ENTRARÁ EL GANCHO PARA AXIAL ROPE EN EL FUTURO ---
+        # --- AJUSTES EXTRA EN LA ATENCIÓN PARA AXIAL ROPE ---
         if pos_frequencies is not None:
-            # Aquí aplicarás las rotaciones a q y k basándote en pos_frequencies
-            pass
+            x_freqs = pos_frequencies["x_freqs"]
+            y_freqs = pos_frequencies["y_freqs"]
+
+            rotary_dim = self.head_dim // 2
+
+            q_x = q[..., :rotary_dim]
+            q_y = q[..., rotary_dim:]
+
+            k_x = k[..., :rotary_dim]
+            k_y = k[..., rotary_dim:]
+
+            q_x = self.apply_rotary(q_x, x_freqs.unsqueeze(1))
+            q_y = self.apply_rotary(q_y, y_freqs.unsqueeze(1))
+
+            k_x = self.apply_rotary(k_x, x_freqs.unsqueeze(1))
+            k_y = self.apply_rotary(k_y,y_freqs.unsqueeze(1))
+
+            q = torch.cat([q_x, q_y], dim=-1)
+            k = torch.cat([k_x, k_y], dim=-1)
         # -----------------------------------------------------------
 
         attn = (q @ k.transpose(-2, -1)) * (self.head_dim ** -0.5)
@@ -40,3 +57,23 @@ class ModularAttention(nn.Module):
         out = (attn @ v).transpose(1, 2).reshape(B, N, D)
         out = self.proj(out)
         return self.proj_drop(out)
+    
+    def rotate_half(self, x):
+
+        x1 = x[..., ::2]
+        x2 = x[..., 1::2]
+
+        return torch.stack(
+            (-x2, x1),
+            dim=-1
+        ).flatten(-2)
+    
+    def apply_rotary(self, x, freqs):
+
+        cos = freqs.cos()
+        sin = freqs.sin()
+
+        cos = torch.repeat_interleave(cos, 2, dim=-1)
+        sin = torch.repeat_interleave(sin, 2, dim=-1)
+
+        return x * cos + self.rotate_half(x) * sin
