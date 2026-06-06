@@ -248,6 +248,70 @@ def gelu_flops(inputs, outputs):
 
     return 8 * numel
 
+# ------------------------------------------------------------------
+# Operadores matemáticos adicionales
+# ------------------------------------------------------------------
+
+def pow_flops(inputs, outputs):
+    """
+    aten::pow (Exponenciación elemental)
+
+    Calcula: z = x^y elemento a elemento. En hardware, elevar a una potencia
+    depende de si el exponente es entero o flotante (a menudo mapeado usando logs/exps).
+    Al igual que GELU o Softmax, se adopta un compromiso estándar para perfiles de ViT.
+
+    Aproximación habitual:
+        - Si es un cuadrado (x^2), equivale a 1 mul (1 FLOP).
+        - Si es potencia general, puede costar varias operaciones.
+    Como norma general y simplificada para perfiles, se cuenta como 1 FLOP por elemento.
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+def reciprocal_flops(inputs, outputs):
+    """
+    aten::reciprocal (Inverso elemental)
+
+    Calcula: z = 1 / x elemento a elemento.
+    Al igual que aten::div, se contabiliza como 1 operación aritmética elemental.
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+def neg_flops(inputs, outputs):
+    """
+    aten::neg (Negación aritmética)
+
+    Calcula: z = -x elemento a elemento.
+    Consiste en invertir el bit de signo. En el conteo teórico de FLOPs de alto nivel,
+    los cambios de signo elementales se consideran como 1 FLOP aritmético.
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+# ------------------------------------------------------------------
+# Manipulación de datos (Frecuente en RoPE antiguos / Atención)
+# ------------------------------------------------------------------
+
+def repeat_interleave_flops(inputs, outputs):
+    """
+    aten::repeat_interleave
+
+    Repite elementos a lo largo de una dimensión. Al igual que aten::pad o 
+    operaciones como reshape/permute, no realiza cálculos aritméticos flotantes, 
+    sino únicamente copias y reordenamientos en memoria (overhead de ancho de banda).
+
+    Por convención en fvcore y benchmarks de ViT:
+        FLOPs = 0
+    """
+    return 0
+
 
 # ------------------------------------------------------------------
 # Registro
@@ -269,6 +333,10 @@ def add_custom_flop_handlers(flops: FlopCountAnalysis):
         "aten::softmax", softmax_flops,
         "aten::gelu", gelu_flops,
         "aten::mean", mean_flops,
+        "aten::pow", pow_flops,
+        "aten::reciprocal", reciprocal_flops,
+        "aten::neg", neg_flops,
+        "aten::repeat_interleave", repeat_interleave_flops,
     )
 
     return flops
