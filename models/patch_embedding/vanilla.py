@@ -34,12 +34,17 @@ class VanillaPatchEmbedding(BasePatchEmbedding):
         self.execution_state.grid_size = self.grid_size
         self.execution_state.embed_dim = embed_dim
         self.execution_state.max_tokens = self.num_patches
+        self.execution_state.patch_size = patch_size
+        self.execution_state.patch_layer = self.proj # Guardamos la referencia de la capa
        
 
     def forward(self, x: torch.Tensor) -> PatchOutput:
         # Recibe: [Nº imágenes, Nº canales, Altura, Anchura]
         B, C, H, W = x.shape
         
+        # INYECCIÓN AL ESTADO: Guardamos la imagen dinámica actual en el buffer de estado
+        self.execution_state.raw_images = x
+
         # 1. Pasar por la convolución: [B, 3, 224, 224] -> [B, 768, 14, 14]
         x_proj = self.proj(x)
         

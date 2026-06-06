@@ -18,7 +18,7 @@ METRIC_CONFIG = {
     "epoch_time_sec": {"label": "Epoch Time (sec)", "type": "line"},
     "inference_time_ms_per_sample": {"label": "Inference Time (ms/sample)", "type": "line"},
     "max_vram_mb": {"label": "Max VRAM (MB)", "type": "bar"},
-    "model_flops": {"label": "Model FLOPs", "type": "bar"},
+    "model_flops": {"label": "FLOPs/sample", "type": "bar"},
     "model_params": {"label": "Model Parameters", "type": "bar"}
 }
 
