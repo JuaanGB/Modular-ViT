@@ -359,6 +359,52 @@ def lt_flops(inputs, outputs):
     """
     return 0
 
+def rsqrt_flop_jit(inputs, outputs):
+    """Contador de FLOPs aproximado para raíces cuadradas (sqrt).
+    Comúnmente se asigna 1 o 2 FLOPs por elemento."""
+    output_shape = outputs[0].type().sizes()
+    num_elements = 1
+    for dim in output_shape:
+        num_elements *= dim
+    # Se estima un coste aproximado de 2 FLOPs por elemento para operaciones element-wise de raíz
+    return num_elements * 2
+
+def tanh_flop_jit(inputs, outputs):
+    """Contador de FLOPs para funciones de activación trascendentales (tanh).
+    Suelen aproximarse comercialmente entre 5 y 8 FLOPs por elemento."""
+    output_shape = outputs[0].type().sizes()
+    num_elements = 1
+    for dim in output_shape:
+        num_elements *= dim
+    return num_elements * 6
+
+def softplus_flop_jit(inputs, outputs):
+    """Contador de FLOPs para Softplus: log(1 + exp(x)).
+    Involucra una exponencial (aprox 6 FLOPs), una suma (1 FLOP) y un logaritmo (aprox 6 FLOPs)."""
+    output_shape = outputs[0].type().sizes()
+    num_elements = 1
+    for dim in output_shape:
+        num_elements *= dim
+    return num_elements * 13
+
+def atan2_flop_jit(inputs, outputs):
+    """Contador de FLOPs para atan2(y, x).
+    Es una función trigonométrica inversa por elemento, estimada comúnmente en unos 12 FLOPs."""
+    output_shape = outputs[0].type().sizes()
+    num_elements = 1
+    for dim in output_shape:
+        num_elements *= dim
+    return num_elements * 12
+
+def sub_flop_jit(inputs, outputs):
+    """Contador de FLOPs para la resta estándar (sub).
+    1 FLOP básico por cada elemento resultante del tensor."""
+    output_shape = outputs[0].type().sizes()
+    num_elements = 1
+    for dim in output_shape:
+        num_elements *= dim
+    return num_elements * 1
+
 # ------------------------------------------------------------------
 # Registro
 # ------------------------------------------------------------------
@@ -386,6 +432,11 @@ def add_custom_flop_handlers(flops: FlopCountAnalysis):
         "aten::sum", sum_flops,
         "aten::log2", log2_flops,
         "aten::lt", lt_flops,
+        "aten::sqrt", rsqrt_flop_jit,
+        "aten::tanh", tanh_flop_jit,
+        "aten::softplus", softplus_flop_jit,
+        "aten::atan2", atan2_flop_jit,
+        "aten::sub", sub_flop_jit,
     )
 
     return flops
