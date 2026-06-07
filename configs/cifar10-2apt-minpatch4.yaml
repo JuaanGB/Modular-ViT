@@ -19,7 +19,7 @@ model:
   patch_embedding:
     type: "adaptive"
     size: 4
-    threshold: 2.2
+    threshold: 2.5
 
 
   token_injection:
