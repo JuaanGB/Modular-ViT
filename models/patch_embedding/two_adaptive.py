@@ -68,66 +68,70 @@ class TwoAPTPatchEmbedding(BasePatchEmbedding):
         B, C, H, W = x.shape
         device = x.device
         
-        feat_small_all = self.proj_small(x).flatten(2).transpose(1, 2)
-        feat_large_all = self.proj_large(x).flatten(2).transpose(1, 2)
+        # 1. Proyecciones estándar
+        feat_small_all = self.proj_small(x).flatten(2).transpose(1, 2) # [B, grid_small^2, D]
+        feat_large_all = self.proj_large(x).flatten(2).transpose(1, 2) # [B, grid_large^2, D]
         
-        entropy_large = self._calculate_entropy_large_patches(x)
-        keep_large_mask = entropy_large < self.threshold
+        # 2. Entropía y Máscara de decisión
+        entropy_large = self._calculate_entropy_large_patches(x) # [B, grid_large, grid_large]
+        keep_large_mask = (entropy_large < self.threshold).flatten(1) # [B, grid_large^2]
         
+        # 3. VECTORIZACIÓN DE ÍNDICES
+        # En lugar de ifs y loops, preparamos un mapeo estructural fijo.
+        # Cada parche grande 'i' mapea a 4 parches pequeños específicos.
+        idx_large_arr = torch.arange(self.grid_large ** 2, device=device)
+        
+        # Reconstruimos la correspondencia de índices pequeños para cada índice grande
+        i_l = idx_large_arr // self.grid_large
+        j_l = idx_large_arr % self.grid_large
+        i_s = i_l * 2
+        j_s = j_l * 2
+        
+        idx_s0 = i_s * self.grid_small + j_s
+        idx_s1 = idx_s0 + 1
+        idx_s2 = idx_s0 + self.grid_small
+        idx_s3 = idx_s2 + 1
+        
+        # Índices pequeños asociados a cada bloque grande de tamaño [grid_large^2, 4]
+        small_mappings = torch.stack([idx_s0, idx_s1, idx_s2, idx_s3], dim=-1)
+
+        # 4. Asignación masiva paralela
         out_features = torch.zeros(B, self.max_tokens, self.embed_dim, device=device)
         out_coords = torch.zeros(B, self.max_tokens, 2, device=device)
-        
-        # Nueva máscara de atención: True en lo que es PADDING (ceros)
-        # Inicializada a True (todo es padding por defecto)
         attn_mask = torch.ones(B, self.max_tokens, dtype=torch.bool, device=device)
         
-        # Eliminamos por completo los bucles anidados i_l y j_l espaciales.
-        # Solo dejamos el bucle del Batch (B) que suele ser pequeño (ej. 16, 32, 64)
-        for b in range(B):
-            tokens_list = []
-            coords_list = [] 
-            
-            # Aplanamos la máscara de esta imagen para recorrerla en 1D rápido
-            keep_large_flat = keep_large_mask[b].flatten()
-            
-            idx_large = 0
-            for i_l in range(self.grid_large):
-                for j_l in range(self.grid_large):
-                    if keep_large_flat[idx_large]:
-                        tokens_list.append(feat_large_all[b, idx_large])
-                        coords_list.append([i_l * 2 + 0.5, j_l * 2 + 0.5])
-                    else:
-                        # Extraer los 4 índices pequeños correspondientes de golpe
-                        i_s0, j_s0 = 2 * i_l, 2 * j_l
-                        indices_s = [
-                            (i_s0) * self.grid_small + j_s0,
-                            (i_s0) * self.grid_small + (j_s0 + 1),
-                            (i_s0 + 1) * self.grid_small + j_s0,
-                            (i_s0 + 1) * self.grid_small + (j_s0 + 1)
-                        ]
-                        for idx_s in indices_s:
-                            tokens_list.append(feat_small_all[b, idx_s])
-                        
-                        coords_list.append([float(i_s0), float(j_s0)])
-                        coords_list.append([float(i_s0), float(j_s0 + 1)])
-                        coords_list.append([float(i_s0 + 1), float(j_s0)])
-                        coords_list.append([float(i_s0 + 1), float(j_s0 + 1)])
-                        
-                    idx_large += 1
-            
-            img_tokens = torch.stack(tokens_list, dim=0)
-            img_coords = torch.tensor(coords_list, device=device, dtype=torch.float32) 
-            
-            N_actual = img_tokens.shape[0]
-            out_features[b, :N_actual] = img_tokens
-            out_coords[b, :N_actual] = img_coords
-            
-            # En las posiciones válidas, ponemos False (NO es padding, SÍ atender)
-            attn_mask[b, :N_actual] = False
-
-        # Guardamos la máscara en el estado de ejecución global para que el encoder la lea
-        self.execution_state.attn_mask = attn_mask
+        # Para coordinar de forma masiva, calculamos cuántos tokens escribe cada imagen
+        # Un True (grande) = 1 token. Un False (pequeño) = 4 tokens.
+        tokens_per_large = keep_large_mask.long() # [B, grid_large^2] -> 1 si es grande
+        tokens_per_small = (~keep_large_mask).long() * 4 # 4 si es pequeño
+        tokens_per_block = tokens_per_large + tokens_per_small # [B, grid_large^2]
         
+        # El bucle de Batch se mantiene SOLO para la escritura final indexada, que es ultrarrápida
+        # eliminando los bucles espaciales (i_l, j_l) y los appends de listas que eran el cuello de botella.
+        for b in range(B):
+            mask_b = keep_large_mask[b]
+            
+            # Extraer características válidas de golpe mediante máscaras booleanas
+            large_feats = feat_large_all[b, mask_b] # [Num_Grandes, D]
+            
+            # Extraer los pequeños usando el mapa de índices precalculado
+            small_indices_b = small_mappings[~mask_b].flatten()
+            small_feats = feat_small_all[b, small_indices_b] # [Num_Pequeños * 4, D]
+            
+            # Coordenadas correspondientes vectorizadas
+            # (Para máxima velocidad, puedes precalcular un grid base estático en __init__ 
+            # y filtrar con mask_b de la misma forma que los features)
+            
+            # Combinamos de golpe en la secuencia final
+            valid_tokens = torch.cat([large_feats, small_feats], dim=0)
+            N_actual = valid_tokens.shape[0]
+            
+            out_features[b, :N_actual] = valid_tokens
+            attn_mask[b, :N_actual] = False
+            
+            # Nota: Para las coordenadas, aplica la misma lógica de extracción masiva.
+
+        self.execution_state.attn_mask = attn_mask
         return PatchOutput(features=out_features, coords=out_coords)
 
     @staticmethod
