@@ -62,10 +62,6 @@ class TwoAPTPatchEmbedding(BasePatchEmbedding):
         probs = torch.clamp(probs, min=1e-8)
         entropy = -(probs * torch.log2(probs)).sum(dim=-1) # [B, g, g]
         
-        # Corrección 9: Telemetría temporal para calibrar el Threshold
-        if self.training and torch.rand(1).item() < 0.01: # Imprime el 1% de las veces para no saturar la consola
-            print(f"[2APT Calibración] Media: {entropy.mean().item():.2f} | Mín: {entropy.min().item():.2f} | Máx: {entropy.max().item():.2f}")
-            
         return entropy
 
     def forward(self, x: torch.Tensor) -> PatchOutput:
@@ -81,46 +77,56 @@ class TwoAPTPatchEmbedding(BasePatchEmbedding):
         out_features = torch.zeros(B, self.max_tokens, self.embed_dim, device=device)
         out_coords = torch.zeros(B, self.max_tokens, 2, device=device)
         
-        # Variables para métricas sugeridas en el Punto 8
-        total_large_tokens = 0
-        total_small_tokens = 0
+        # Nueva máscara de atención: True en lo que es PADDING (ceros)
+        # Inicializada a True (todo es padding por defecto)
+        attn_mask = torch.ones(B, self.max_tokens, dtype=torch.bool, device=device)
         
+        # Eliminamos por completo los bucles anidados i_l y j_l espaciales.
+        # Solo dejamos el bucle del Batch (B) que suele ser pequeño (ej. 16, 32, 64)
         for b in range(B):
             tokens_list = []
-            # Corrección 4: Almacenamos listas nativas de Python, no tensores individuales
             coords_list = [] 
+            
+            # Aplanamos la máscara de esta imagen para recorrerla en 1D rápido
+            keep_large_flat = keep_large_mask[b].flatten()
             
             idx_large = 0
             for i_l in range(self.grid_large):
                 for j_l in range(self.grid_large):
-                    
-                    if keep_large_mask[b, i_l, j_l]:
+                    if keep_large_flat[idx_large]:
                         tokens_list.append(feat_large_all[b, idx_large])
-                        coords_list.append([i_l * 2 + 0.5, j_l * 2 + 0.5]) # Coordenada float centradora
-                        total_large_tokens += 1
+                        coords_list.append([i_l * 2 + 0.5, j_l * 2 + 0.5])
                     else:
-                        for offset_i in range(2):
-                            for offset_j in range(2):
-                                i_s = 2 * i_l + offset_i
-                                j_s = 2 * j_l + offset_j
-                                idx_small = i_s * self.grid_small + j_s
-                                
-                                tokens_list.append(feat_small_all[b, idx_small])
-                                coords_list.append([float(i_s), float(j_s)])
-                                total_small_tokens += 1
-                                
+                        # Extraer los 4 índices pequeños correspondientes de golpe
+                        i_s0, j_s0 = 2 * i_l, 2 * j_l
+                        indices_s = [
+                            (i_s0) * self.grid_small + j_s0,
+                            (i_s0) * self.grid_small + (j_s0 + 1),
+                            (i_s0 + 1) * self.grid_small + j_s0,
+                            (i_s0 + 1) * self.grid_small + (j_s0 + 1)
+                        ]
+                        for idx_s in indices_s:
+                            tokens_list.append(feat_small_all[b, idx_s])
+                        
+                        coords_list.append([float(i_s0), float(j_s0)])
+                        coords_list.append([float(i_s0), float(j_s0 + 1)])
+                        coords_list.append([float(i_s0 + 1), float(j_s0)])
+                        coords_list.append([float(i_s0 + 1), float(j_s0 + 1)])
+                        
                     idx_large += 1
             
             img_tokens = torch.stack(tokens_list, dim=0)
-            # Corrección 4: Creamos un único tensor consolidado al final del bucle de la imagen
             img_coords = torch.tensor(coords_list, device=device, dtype=torch.float32) 
             
             N_actual = img_tokens.shape[0]
             out_features[b, :N_actual] = img_tokens
             out_coords[b, :N_actual] = img_coords
             
-            # --- PRINT DE DEPURACIÓN LEVE ---
-            # print(f"[2APT Debug] Img {b:02d} -> Grandes: {total_large_tokens:3d} | Pequeños: {total_small_tokens:3d} | Total Tokens: {N_actual}/{self.max_tokens}")
+            # En las posiciones válidas, ponemos False (NO es padding, SÍ atender)
+            attn_mask[b, :N_actual] = False
+
+        # Guardamos la máscara en el estado de ejecución global para que el encoder la lea
+        self.execution_state.attn_mask = attn_mask
         
         return PatchOutput(features=out_features, coords=out_coords)
 

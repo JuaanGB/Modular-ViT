@@ -13,3 +13,6 @@ class ExecutionState:
     token_coords: Optional[torch.Tensor] = None
     head_dim: Optional[int] = None
     num_heads: Optional[int] = None
+
+    # Para APT
+    attn_mask: Optional[torch.Tensor] = None

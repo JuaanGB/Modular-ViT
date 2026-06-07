@@ -17,7 +17,7 @@ class ModularAttention(nn.Module):
         self.attn_drop = nn.Dropout(dropout)
         self.proj_drop = nn.Dropout(dropout)
 
-    def forward(self, x: torch.Tensor, pos_frequencies=None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, pos_frequencies=None, mask: torch.Tensor = None) -> torch.Tensor:
         """
         Args:
             x: Tensor [Batch, Num_Tokens, Embed_Dim]
@@ -51,6 +51,14 @@ class ModularAttention(nn.Module):
         # -----------------------------------------------------------
 
         attn = (q @ k.transpose(-2, -1)) * (self.head_dim ** -0.5)
+
+        # --- CONTROL DE MÁSCARA DINÁMICA ---
+        if mask is not None:
+            # Reajustamos la forma de la máscara de [B, N] a [B, 1, 1, N] para que se acople por broadcasting
+            # Cambiamos los elementos True (padding) por un número muy bajo (-infinito o -1e9)
+            mask_expanded = mask.unsqueeze(1).unsqueeze(2) # Formato: [B, 1, 1, N]
+            attn = attn.masked_fill(mask_expanded, float('-inf'))
+
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
 

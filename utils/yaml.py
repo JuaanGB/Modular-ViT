@@ -162,7 +162,8 @@ def create_vit_from_config(config: dict) -> ModularViT:
         TransformerEncoderBlock(
             embed_dim=embed_dim, 
             num_heads=num_heads, 
-            mlp_ratio=mlp_ratio
+            mlp_ratio=mlp_ratio,
+            execution_state=execution_state
         )
         for _ in range(depth)
     ])
