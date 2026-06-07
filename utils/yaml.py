@@ -6,7 +6,7 @@ import yaml
 from models.vit import ModularViT
 
 from models.patch_embedding.vanilla import VanillaPatchEmbedding
-from models.patch_embedding.adaptive import APTPatchEmbedding
+from models.patch_embedding.two_adaptive import TwoAPTPatchEmbedding 
 
 from models.token_injection.cls import CLSTokenInjection
 from models.token_injection.none import IdentityTokenInjection
@@ -27,7 +27,7 @@ import torch.nn as nn
 
 PATCH_MECHANISMS = {
     "vanilla": VanillaPatchEmbedding,
-    "adaptive": APTPatchEmbedding,
+    "adaptive": TwoAPTPatchEmbedding,
     # "cnn": CNNPatchEmbedding
 }
 
