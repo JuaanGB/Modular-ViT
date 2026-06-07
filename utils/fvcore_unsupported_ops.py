@@ -312,6 +312,52 @@ def repeat_interleave_flops(inputs, outputs):
     """
     return 0
 
+# ------------------------------------------------------------------
+# Reducciones y Matemáticas adicionales (Para Entropía 2APT)
+# ------------------------------------------------------------------
+
+def sum_flops(inputs, outputs):
+    """
+    aten::sum
+
+    Calcula la suma acumulada a lo largo de una o varias dimensiones.
+    Para reducir N elementos a 1, se requieren exactamente N - 1 sumas flotantes.
+    
+    Aproximación estándar:
+        FLOPs = numel(inputs) - numel(outputs)
+    """
+    numel_in = _numel_from_value(inputs[0])
+    numel_out = _numel_from_value(outputs[0])
+    
+    # Aseguramos que no devuelva negativo por si acaso hay dimensiones vacías
+    return max(0, numel_in - numel_out)
+
+
+def log2_flops(inputs, outputs):
+    """
+    aten::log2
+
+    Logaritmo elemental en base 2 elemento a elemento (usado en la entropía de Shannon).
+    Al ser una operación matemática trascendente sobre el tensor, se cuenta como 
+    1 FLOP por elemento del tensor resultante.
+
+    FLOPs = número de elementos del tensor de salida
+    """
+    return _numel_from_value(outputs[0])
+
+
+def lt_flops(inputs, outputs):
+    """
+    aten::lt (Less Than)
+
+    Operador lógico de comparación elemental (x < y) utilizado para generar 
+    la máscara booleana de los parches basada en el umbral (threshold).
+    Las operaciones lógicas/comparaciones no realizan aritmética flotante,
+    por lo que en perfiles de ViT clásicos computan como 0 FLOPs.
+
+    FLOPs = 0
+    """
+    return 0
 
 # ------------------------------------------------------------------
 # Registro
@@ -337,6 +383,9 @@ def add_custom_flop_handlers(flops: FlopCountAnalysis):
         "aten::reciprocal", reciprocal_flops,
         "aten::neg", neg_flops,
         "aten::repeat_interleave", repeat_interleave_flops,
+        "aten::sum", sum_flops,
+        "aten::log2", log2_flops,
+        "aten::lt", lt_flops,
     )
 
     return flops
