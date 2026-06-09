@@ -10,7 +10,7 @@ training:
   weight_decay: 0.05
 
 model:
-  name: "CIFAR10-ViT-APT"
+  name: "CIFAR10-ViT-2APT"
   embed_dim: 192
   depth: 12
   num_heads: 12

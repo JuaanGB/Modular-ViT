@@ -10,7 +10,7 @@ training:
   weight_decay: 0.05
 
 model:
-  name: "CIFAR10-ViTBase"
+  name: "CIFAR10-ViTBase-4x4"
   embed_dim: 192
   depth: 12
   num_heads: 12

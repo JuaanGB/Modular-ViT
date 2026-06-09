@@ -1,7 +1,7 @@
 dataset:
   name: "CIFAR10"
   in_channels: 3
-  img_size: 32
+  img_size: 224
 
 training:
   batch_size: 64
@@ -10,24 +10,21 @@ training:
   weight_decay: 0.05
 
 model:
-  name: "CIFAR10-ViT-GAP+GMP"
-  embed_dim: 192
+  name: "CIFAR10-ViTBase"
+  embed_dim: 768
   depth: 12
   num_heads: 12
   mlp_ratio: 4.0
 
   patch_embedding:
     type: "vanilla"
-    size: 4
+    size: 16
 
   token_injection:
-    type: "none"
+    type: "cls"
 
   positional_encoding:
     type: "absolute"
 
-  attention:
-    type: "vanilla"
-
   aggregation:
-    type: "gap+gmp"  
+    type: "cls"  
