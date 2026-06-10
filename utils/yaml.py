@@ -22,6 +22,7 @@ from models.encoder.encoder_block import TransformerEncoderBlock
 from models.aggregation.cls import CLSAggregation
 from models.aggregation.gap import GAPAggregation
 from models.aggregation.gap_gmp import GAPGMPAggregation 
+from models.aggregation.attention_pooling import AttentionPoolingAggregation
 
 from models.ExecutionState import ExecutionState
 
@@ -48,8 +49,8 @@ POSITIONAL_ENCODING_MECHANISMS = {
 AGGREGATION_MECHANISMS = {
     "cls": CLSAggregation,
     "gap": GAPAggregation,
-    "gap+gmp": GAPGMPAggregation
-    # "mean": MeanAgregation
+    "gap+gmp": GAPGMPAggregation,
+    "attention-pooling": AttentionPoolingAggregation
 }
 
 def parse_yaml_config(config_path: str) -> dict:

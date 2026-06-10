@@ -1,0 +1,30 @@
+dataset:
+  name: "CIFAR10"
+  in_channels: 3
+  img_size: 32
+
+training:
+  batch_size: 64
+  lr: 0.001
+  epochs: 70
+  weight_decay: 0.05
+
+model:
+  name: "CIFAR10-ViT.GAP"
+  embed_dim: 192
+  depth: 12
+  num_heads: 12
+  mlp_ratio: 4.0
+
+  patch_embedding:
+    type: "vanilla"
+    size: 4
+
+  token_injection:
+    type: "none"
+
+  positional_encoding:
+    type: "absolute"
+
+  aggregation:
+    type: "attention-pooling"  
