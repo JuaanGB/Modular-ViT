@@ -2,6 +2,7 @@ dataset:
   name: "CIFAR100"
   in_channels: 3
   img_size: 32
+  num_classes: 100
 
 training:
   batch_size: 64
@@ -10,22 +11,21 @@ training:
   weight_decay: 0.05
 
 model:
-  name: "CIFAR100-ViT-COMB1"
+  name: "CIFAR100-ViT-WePE"
   embed_dim: 192
   depth: 12
   num_heads: 12
   mlp_ratio: 4.0
 
   patch_embedding:
-    type: "cnn"
+    type: "vanilla"
     size: 4
-    kernel_size: 3
 
   token_injection:
-    type: "none"
+    type: "cls"
 
   positional_encoding:
-    type: "axial-rope"
+    type: "wepe"
 
   aggregation:
-    type: "attention-pooling"  
+    type: "cls"  

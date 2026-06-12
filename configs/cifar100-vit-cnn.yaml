@@ -2,6 +2,7 @@ dataset:
   name: "CIFAR100"
   in_channels: 3
   img_size: 32
+  num_classes: 100
 
 training:
   batch_size: 64
@@ -10,22 +11,22 @@ training:
   weight_decay: 0.05
 
 model:
-  name: "CIFAR100-ViT-COMB2"
+  name: "CIFAR100-ViT-CNN"
   embed_dim: 192
   depth: 12
   num_heads: 12
   mlp_ratio: 4.0
 
   patch_embedding:
-    type: "overlapping"
+    type: "cnn"
     size: 4
-    overlap_pixels: 2
+    kernel_size: 3
 
   token_injection:
     type: "cls"
 
   positional_encoding:
-    type: "wepe"
+    type: "absolute"
 
   aggregation:
     type: "cls"  

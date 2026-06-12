@@ -2,6 +2,7 @@ dataset:
   name: "CIFAR100"
   in_channels: 3
   img_size: 32
+  num_classes: 100
 
 training:
   batch_size: 64
