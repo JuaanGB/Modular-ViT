@@ -26,9 +26,6 @@ model:
 
   positional_encoding:
     type: "absolute"
-
-  attention:
-    type: "vanilla"
-
+    
   aggregation:
     type: "cls"  

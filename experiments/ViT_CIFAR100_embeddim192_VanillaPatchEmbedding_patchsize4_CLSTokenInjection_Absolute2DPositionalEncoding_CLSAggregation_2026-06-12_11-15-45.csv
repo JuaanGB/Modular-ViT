@@ -1,1 +1,0 @@
-epoch,train_loss,train_acc,test_loss,test_acc,epoch_time_sec,inference_time_ms_per_sample,max_vram_mb,model_flops,model_params
