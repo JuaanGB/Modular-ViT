@@ -1,0 +1,31 @@
+dataset:
+  name: "CIFAR100"
+  in_channels: 3
+  img_size: 32
+
+training:
+  batch_size: 64
+  lr: 0.001
+  epochs: 70
+  weight_decay: 0.05
+
+model:
+  name: "CIFAR100-ViT-COMB1"
+  embed_dim: 192
+  depth: 12
+  num_heads: 12
+  mlp_ratio: 4.0
+
+  patch_embedding:
+    type: "cnn"
+    size: 4
+    kernel_size: 3
+
+  token_injection:
+    type: "none"
+
+  positional_encoding:
+    type: "axial-rope"
+
+  aggregation:
+    type: "attention-pooling"  
