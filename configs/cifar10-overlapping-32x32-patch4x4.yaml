@@ -2,6 +2,7 @@ dataset:
   name: "CIFAR10"
   in_channels: 3
   img_size: 32
+  num_classes: 10
 
 training:
   batch_size: 64
@@ -21,15 +22,11 @@ model:
     size: 4
     overlap_pixels: 2
 
-
   token_injection:
     type: "cls"
 
   positional_encoding:
     type: "absolute"
-
-  attention:
-    type: "vanilla"
 
   aggregation:
     type: "cls"  

@@ -2,6 +2,7 @@ dataset:
   name: "CIFAR10"
   in_channels: 3
   img_size: 32
+  num_classes: 10
 
 training:
   batch_size: 64
@@ -25,9 +26,6 @@ model:
 
   positional_encoding:
     type: "absolute"
-
-  attention:
-    type: "vanilla"
 
   aggregation:
     type: "gap"  
