@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter.font as tkfont
 import colorsys
+import zipfile  # NUEVO: Para crear el archivo comprimido
 
 # ==========================================
 # CONFIGURACIÓN DE MÉTRICAS Y TIPOS DE GRÁFICO
@@ -18,7 +19,7 @@ METRIC_CONFIG = {
     "epoch_time_sec": {"label": "Epoch Time (sec)", "type": "line"},
     "inference_time_ms_per_sample": {"label": "Inference Time (ms/sample)", "type": "line"},
     "max_vram_mb": {"label": "Max VRAM (MB)", "type": "bar"},
-    "model_flops": {"label": "Model FLOPs", "type": "bar"},
+    "model_flops": {"label": "Model FLOPs (GFLOPs)", "type": "bar"},
     "model_params": {"label": "Model Parameters", "type": "bar"}
 }
 
@@ -62,12 +63,14 @@ class AppVisualizador:
     def __init__(self, root):
         self.root = root
         self.root.title("Visualizador de Métricas - TFG")
-        self.root.geometry("1050x850")
+        self.root.geometry("900x850") # Un poco más ancho para acomodar el nuevo botón
         
-        # Estructura: { file_path: {"name": str, "df": DataFrame, "color": str, "alias_var": tk.StringVar} }
         self.loaded_files = {}  
         self.current_metric = "train_loss"
         self.color_counter = 0 
+        
+        self.font_size_var = tk.IntVar(value=10)
+        self.font_size_var.trace_add("write", lambda *args: self.update_plot())
         
         self.label_font = tkfont.Font(family="Arial", size=9, weight="bold")
         self.setup_ui()
@@ -83,8 +86,13 @@ class AppVisualizador:
         self.color_counter += 1
         return color
 
+    def change_font_size(self, delta):
+        new_size = self.font_size_var.get() + delta
+        if 6 <= new_size <= 24:
+            self.font_size_var.set(new_size)
+
     def setup_ui(self):
-        # 1. Zona Superior: Panel de Control de Archivos
+        # 1. Zona Superior: Panel de Control de Archivos, Fuentes y Exportación
         top_frame = tk.Frame(self.root, pady=10, padx=10)
         top_frame.pack(fill=tk.X, side=tk.TOP)
         
@@ -110,6 +118,33 @@ class AppVisualizador:
         
         scroll_canvas.pack(side=tk.LEFT, fill=tk.X, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # NUEVO: Botón para exportar todas las métricas a ZIP
+        btn_zip = tk.Button(top_frame, text="💾\nExportar Todo\na ZIP", command=self.export_all_to_zip,
+                            bg="#008CBA", fg="white", font=("Arial", 10, "bold"),
+                            width=14, relief=tk.FLAT, bd=0, highlightthickness=0,
+                            activebackground="#007096", activeforeground="white")
+        btn_zip.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
+        ToolTip(btn_zip, "Genera y guarda automáticamente las 9 gráficas\nen un único archivo comprimido .zip")
+
+        # Panel de Control del Tamaño de Fuente
+        font_frame = tk.LabelFrame(top_frame, text=" Tamaño Letra ", font=("Arial", 8, "bold"), padx=5, pady=5)
+        font_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
+        
+        font_controls = tk.Frame(font_frame)
+        font_controls.pack(expand=True)
+
+        btn_minus = tk.Button(font_controls, text="-", command=lambda: self.change_font_size(-1),
+                              font=("Arial", 12, "bold"), width=3, bg="#e0e0e0", relief=tk.GROOVE)
+        btn_minus.pack(side=tk.LEFT, padx=2)
+
+        lbl_size = tk.Label(font_controls, textvariable=self.font_size_var, 
+                            font=("Arial", 12, "bold"), width=3, anchor="center")
+        lbl_size.pack(side=tk.LEFT, padx=2)
+
+        btn_plus = tk.Button(font_controls, text="+", command=lambda: self.change_font_size(1),
+                             font=("Arial", 12, "bold"), width=3, bg="#e0e0e0", relief=tk.GROOVE)
+        btn_plus.pack(side=tk.LEFT, padx=2)
 
         # 2. Zona Central: Gráfica Matplotlib
         self.chart_frame = tk.Frame(self.root, bg="white", relief=tk.RIDGE, bd=2)
@@ -152,28 +187,22 @@ class AppVisualizador:
         try:
             df = pd.read_csv(file_path)
             if 'model_flops' in df.columns:
-                # Convertimos a string para limpiar posibles sufijos de texto (' MFLOPs', ' GFLOPs', etc.)
                 raw_val = df['model_flops'].astype(str).str.upper()
-                
-                # Comprobamos cómo vienen los datos en tu CSV para convertirlos a GFLOPs (Base 10^9)
                 if raw_val.str.contains('MFLOPS').any():
                     df['model_flops'] = raw_val.str.replace(' MFLOPS', '', regex=False).str.strip().astype(float) / 1000.0
                 elif raw_val.str.contains('GFLOPS').any():
                     df['model_flops'] = raw_val.str.replace(' GFLOPS', '', regex=False).str.strip().astype(float)
                 else:
-                    # Si vienen como números planos en FLOPs (ej: 3200000000) lo pasamos a GFLOPs
                     df['model_flops'] = pd.to_numeric(raw_val.str.replace(' FLOPS', '', regex=False).str.strip())
-                    if df['model_flops'].max() > 1e6: # Si el número es gigante, asumimos que venía en FLOPs puros
+                    if df['model_flops'].max() > 1e6:
                         df['model_flops'] = df['model_flops'] / 1e9
                 
             filename = os.path.basename(file_path)
             assigned_color = self.generate_next_color()
             
-            # MAGIA NUEVA: Calcula el índice secuencial según los archivos cargados
             next_index = len(self.loaded_files) + 1
             default_alias = f"Gráfica {next_index}"
             
-            # La variable reactiva ahora recibe el alias limpio e idóneo para la captura
             alias_var = tk.StringVar(value=default_alias)
             alias_var.trace_add("write", lambda *args: self.update_plot())
             
@@ -203,7 +232,6 @@ class AppVisualizador:
             
         for path, info in self.loaded_files.items():
             bg_color = info["color"]
-            
             r, g, b = int(bg_color[1:3], 16), int(bg_color[3:5], 16), int(bg_color[5:7], 16)
             luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
             fg_color = "black" if luminance > 0.6 else "white"
@@ -226,7 +254,6 @@ class AppVisualizador:
                                   insertbackground=fg_color, highlightthickness=0)
             entry_name.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
             
-            # El tooltip sigue manteniendo la traza del fichero largo original por seguridad
             ToolTip(entry_name, f"Archivo original: {info['name']}\nRuta completa: {path}")
 
     def change_metric(self, metric_id):
@@ -238,10 +265,11 @@ class AppVisualizador:
         config = METRIC_CONFIG[self.current_metric]
         metric_label = config["label"]
         graph_type = config["type"]
+        current_fs = self.font_size_var.get()
         
         if not self.loaded_files:
             self.ax.text(0.5, 0.5, "Añade archivos CSV para comenzar a visualizar", 
-                         ha='center', va='center', fontsize=12, color='gray')
+                         ha='center', va='center', fontsize=current_fs + 2, color='gray')
             self.ax.set_axis_off()
             self.canvas.draw()
             return
@@ -258,10 +286,10 @@ class AppVisualizador:
                     self.ax.plot(df['epoch'], df[self.current_metric], marker='o', 
                                  linewidth=2, color=color, label=graph_alias)
             
-            self.ax.set_xlabel("Epoch")
-            self.ax.set_ylabel(metric_label)
+            self.ax.set_xlabel("Epoch", fontsize=current_fs)
+            self.ax.set_ylabel(metric_label, fontsize=current_fs)
             self.ax.grid(True, linestyle='--', alpha=0.6)
-            self.ax.legend(loc="best", fontsize=9, framealpha=0.8)
+            self.ax.legend(loc="best", fontsize=current_fs, framealpha=0.8)
             
         elif graph_type == "bar":
             names = []
@@ -281,14 +309,60 @@ class AppVisualizador:
                 bars = self.ax.bar(x_positions, values, color=colors, edgecolor='black', alpha=0.8, width=0.4)
                 
                 self.ax.set_xticks(x_positions)
-                self.ax.set_xticklabels(names, rotation=15, ha="right", fontsize=9)
-                self.ax.set_ylabel(metric_label)
+                self.ax.set_xticklabels(names, rotation=15, ha="right", fontsize=current_fs)
+                self.ax.set_ylabel(metric_label, fontsize=current_fs)
                 self.ax.grid(axis='y', linestyle='--', alpha=0.5)
-                self.ax.bar_label(bars, fmt='%.2f', padding=3, fontsize=9)
+                self.ax.bar_label(bars, fmt='%.2f', padding=3, fontsize=current_fs)
                 
-        self.ax.set_title(f"Comparativa: {metric_label}", fontsize=12, fontweight='bold', pad=15)
+        self.ax.tick_params(axis='both', which='major', labelsize=current_fs)
+        self.ax.set_title(f"Comparativa: {metric_label}", fontsize=current_fs + 3, fontweight='bold', pad=15)
         self.fig.tight_layout()
         self.canvas.draw()
+
+    # NUEVA FUNCIÓN: Exportar de forma automática
+    def export_all_to_zip(self):
+        if not self.loaded_files:
+            messagebox.showwarning("Advertencia", "Debes cargar al menos un archivo CSV antes de exportar.")
+            return
+
+        # Pedir al usuario dónde guardar el archivo ZIP
+        zip_path = filedialog.asksaveasfilename(
+            defaultextension=".zip",
+            filetypes=[("ZIP files", "*.zip")],
+            title="Guardar todas las gráficas como..."
+        )
+        
+        if not zip_path:
+            return  # El usuario canceló la operación
+
+        try:
+            # Guardamos cuál es la métrica que el usuario está viendo actualmente para restaurarla después
+            saved_metric = self.current_metric
+
+            # Creamos el archivo ZIP
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Recorremos de manera programática las 9 métricas de la configuración
+                for metric_id, config in METRIC_CONFIG.items():
+                    # Cambiamos internamente la métrica y redibujamos el objeto Figure
+                    self.current_metric = metric_id
+                    self.update_plot()
+                    
+                    # Nombre único del archivo de imagen temporal dentro del ZIP
+                    img_filename = f"{metric_id}.png"
+                    
+                    # Matplotlib permite guardar la figura directamente en el ZIP pasándole el manejador
+                    # con una resolución limpia (dpi=150) ideal para documentos de texto
+                    with zipf.open(img_filename, 'w') as img_file:
+                        self.fig.savefig(img_file, format='png', dpi=150)
+
+            # Restauramos la vista de la métrica original en la interfaz de usuario
+            self.current_metric = saved_metric
+            self.update_plot()
+
+            messagebox.showinfo("Éxito", f"¡Operación completada!\nLas 9 gráficas han sido exportadas a:\n{zip_path}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Ocurrió un fallo al generar el archivo comprimido:\n{e}")
 
 if __name__ == "__main__":
     root = tk.Tk()
