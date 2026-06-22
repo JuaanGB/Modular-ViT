@@ -188,7 +188,7 @@ Documentación adicional disponible en la carpeta `docs/`:
 
 ---
 
-# Autor
+# Juan Alejandro González Ballesta
 
 Trabajo Fin de Grado en Ingeniería Informática.
 
